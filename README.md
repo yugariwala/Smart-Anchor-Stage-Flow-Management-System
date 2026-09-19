@@ -7,6 +7,30 @@ approved revision to every screen at once — or refuses, with the shortage quan
 This repository is the implementation for the *Smart Anchor / Stage Flow Management System*
 problem statement.
 
+## Screenshots
+
+The organizer console is the centre of the product: current activity, live agenda, the repair
+trigger, and anchor status in one view.
+
+<p align="center">
+  <img src="docs/screenshots/console.png" width="82%" alt="Organizer console with live stage overview, agenda and repair controls" />
+</p>
+
+When an overrun is entered, the server returns a before/after plan with the weighted cost and
+every hard-rule check — and the shortage quantified when no feasible plan exists.
+
+<p align="center">
+  <img src="docs/screenshots/repair-preview.png" width="82%" alt="Repair preview dialog showing proposed interval changes and hard-rule checks" />
+</p>
+
+| Workspace | Event setup |
+|---|---|
+| ![Workspace listing events](docs/screenshots/workspace.png) | ![Event setup with agenda and facts](docs/screenshots/setup.png) |
+
+| Speakers & facts | Anchor runbook (mobile) |
+|---|---|
+| ![Speakers and approved facts](docs/screenshots/speakers.png) | <img src="docs/screenshots/anchor-mobile.png" width="240" alt="Anchor runbook on a mobile screen" /> |
+
 ## What it does
 
 - **Repairs a running schedule.** Given an overrun, `repairSchedule` is a pure, deterministic
@@ -22,6 +46,57 @@ problem statement.
   fallback is always available and labelled as such.
 - **Records reality, flags the conflict.** A cue completion that violates the plan is still
   recorded, with `scheduleHealth: "needs_repair"`.
+
+## Features and progress
+
+Milestones **M0–M5 are complete**; **M6 is partially complete**. Roughly **90–95%** of the
+specified scope is implemented, with the remainder being an accessibility/localisation polish
+pass rather than product functionality.
+
+| # | Milestone | Progress |
+|---|---|---|
+| M0a | Monorepo substrate: npm workspaces, strict TS, Vitest, `packages/domain` skeleton | Complete |
+| M0b | `apps/web` scaffold: anonymous sign-in + connectivity probe | Complete |
+| M1 | Deterministic repair solver, independent `validatePlan`, fixture, brute-force tests | Complete |
+| M2 | Worker router, `EventRoom`/`QuotaRoom` Durable Objects, token verification, full event command set, 72h expiry | Complete |
+| M3 | `renderOperationalCue`, repair proposals + approval, cue start/complete, rehearsal clock | Complete |
+| M4 | Organizer console, anchor view, setup screen, repair preview | Complete |
+| M5 | Gemini script proposals + approval, template fallback, announcements | Complete |
+| M6 | Offline snapshot cache, countdown offset, printable runbook | Complete |
+| M6 | Accessibility pass (focus management, live regions, keyboard) | Partial |
+| M6 | Full UI localisation (multilingual copy generation already works) | Planned |
+
+Feature-level status:
+
+| Area | Feature | Status |
+|---|---|---|
+| Platform | Anonymous auth, server-side ID-token verification (JWKS/RS256) | Complete |
+| Platform | Identity-scoped browser workspace, event shortcuts, sign-out | Complete |
+| Platform | 72-hour demonstration expiry and permanent deletion | Complete |
+| Setup | Create event with start, hard finish and rehearsal/live mode | Complete |
+| Setup | Agenda builder: durations, minimums, penalties, buffers, not-before, fixed start | Complete |
+| Setup | Speakers, pronunciation hints and approved facts (reserved fact-id prefixes enforced) | Complete |
+| Setup | CSV agenda import | Complete |
+| Setup | One-click fictional rehearsal (`college-demo-v1`) | Complete |
+| Engine | Bounded-DP constraint-aware repair solver + independent validation | Complete |
+| Engine | Feasible before/after plan; quantified refusal when infeasible | Complete |
+| Backend | Worker router, `EventRoom`/`QuotaRoom` SQLite Durable Objects, daily quota | Complete |
+| Backend | Immutable published revisions and revision history | Complete |
+| Backend | Idempotency keys and `expectedRevision` conflict handling | Complete |
+| Live ops | Cue start/complete, scenario clock, overrun entry and forecast | Complete |
+| Live ops | Live stage overview: on stage, current activity, up next, countdown | Complete |
+| Live ops | Readiness reminder for the next cue | Complete |
+| Live ops | Anchor invitations, join, per-revision acknowledgment and behind tracking | Complete |
+| Content | Gemini host-script drafts with mandated labels, human review and approval | Complete |
+| Content | Deterministic template fallback when the AI provider is unavailable | Complete |
+| Content | Announcements: publish, display and dismiss | Complete |
+| Content | Multilingual host copy: English, Hindi, Gujarati | Complete |
+| UX | 2s visibility-aware polling with live/amber/stale freshness and backoff | Complete |
+| UX | Offline snapshot cache with the labelled stale view | Complete |
+| UX | Printable runbook (approved copy + speaker facts) | Complete |
+| UX | Accessibility polish (focus traps, live regions, non-colour cues) | Partial |
+| UX | Localised interface chrome | Planned |
+| Quality | Domain tests on node, API tests in real `workerd`, Playwright browser e2e | Complete |
 
 ## Stack
 
@@ -46,7 +121,7 @@ packages/
   domain/   Shared Zod schemas, types, and the deterministic repair solver
 tests/
   api/      Worker integration tests (real workerd)
-docs/       Decisions log, demo script, measurements, frontend plans
+docs/       Decisions log, demo script, measurements, screenshots
 fixtures/   Seed scenarios used by tests and the rehearsal
 ```
 
@@ -62,8 +137,9 @@ npm run dev:web        # vite on http://localhost:5173
 ```
 
 `apps/api/.dev.vars` is required for `wrangler dev` and is gitignored. Copy
-`apps/api/.dev.vars.example` and fill it in. `GEMINI_API_KEY` is a Worker secret, set with
-`npx wrangler secret put GEMINI_API_KEY`, and must never be committed.
+`apps/api/.dev.vars.example` and fill it in. The web app also needs Firebase web config in
+`apps/web/.env.local` (copy `apps/web/.env.example`). `GEMINI_API_KEY` is a Worker secret, set
+with `npx wrangler secret put GEMINI_API_KEY`, and must never be committed.
 
 ## Commands
 
