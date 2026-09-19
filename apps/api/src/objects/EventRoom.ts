@@ -22,6 +22,7 @@ import {
   draftConfigSchema,
   draftCueInputSchema,
   eventStateSchema,
+  idSchema,
   organizerFactSchema,
   materializeDraftCues,
   planIsValid,
@@ -39,9 +40,15 @@ import {
   type RepairInput,
   type RepairResult,
   type Role,
+  type ApprovedScript,
+  type Announcement,
+  type Language,
+  type ScriptKind,
   z,
 } from '@cuepilot/domain';
 
+import { generateScriptDraft, type FetchLike } from '../ai/gemini';
+import { buildEnvelope, PROMPT_VERSION, type ScriptEnvelope } from '../ai/prompt';
 import { throwApi } from '../http/errors';
 import SCHEMA_SQL from '../storage/schema.sql';
 
@@ -71,6 +78,21 @@ const TOMBSTONE_JSON = '{"tombstone":true}';
  * would either keep dead proposals alive forever or expire live ones on a paused scenario.
  */
 const PROPOSAL_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * The AI in-flight LEASE, not a lock (§12: "release the in-flight slot in finally, with a
+ * short lease expiry for crashes").
+ *
+ * A boolean flag would wedge an event permanently the first time an isolate is evicted
+ * mid-generation, and with only ten attempts a day the organizer could not work around it.
+ * An expiring reservation self-heals: the `finally` clears it in the normal case, and if the
+ * isolate dies the row is simply ignored once `reset_at` passes. 30s = the 12s provider
+ * deadline plus margin, so a slow-but-alive generation is never double-run.
+ */
+const AI_LEASE_MS = 30_000;
+
+/** §12 defaults for the per-event AI caps. The project cap lives in QuotaRoom. */
+const AI_EVENT_DAY_LIMIT = 10;
 
 /** Every mutation carries these. `expectedRevision` is absent only on creation (§12, #4). */
 export type MutationEnvelope = {
@@ -122,6 +144,25 @@ const rehearsalClockBodySchema = z.strictObject({
   nowAt: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/, 'must be UTC ISO-8601 ending in Z'),
+});
+
+const scriptProposalBodySchema = z.strictObject({
+  expectedRevision: z.int().min(1),
+  kind: z.enum(['opening', 'introduction', 'transition', 'closing', 'announcement']),
+  cueId: idSchema.nullable(),
+  language: z.enum(['en', 'hi', 'gu']),
+});
+
+const scriptApproveBodySchema = z.strictObject({
+  expectedRevision: z.int().min(1),
+  body: z.string().min(1).max(1500),
+  usedFactIds: z.array(z.string().min(1).max(128)).max(50),
+});
+
+const announcementBodySchema = z.strictObject({
+  expectedRevision: z.int().min(1),
+  text: z.string().min(1).max(500),
+  language: z.enum(['en', 'hi', 'gu']),
 });
 
 type ProposalRow = {
@@ -984,6 +1025,394 @@ export class EventRoom extends DurableObject<Env> {
         result: JSON.parse(p.result_json) as RepairResult,
       },
     };
+  }
+
+
+  // ─────────────────────── Milestone 5: script proposals ───────────────────────────────
+
+  /** Reads the AI in-flight lease. An expired row is treated as absent. */
+  private aiLeaseHeld(nowIso: string): boolean {
+    const rows = this.ctx.storage.sql
+      .exec<{ reset_at: string }>(
+        "SELECT reset_at FROM counters WHERE counter_key = 'ai:inflight'",
+      )
+      .toArray();
+    const row = rows[0];
+    return row !== undefined && Date.parse(row.reset_at) > Date.parse(nowIso);
+  }
+
+  private takeAiLease(nowIso: string): void {
+    const resetAt = new Date(Date.parse(nowIso) + AI_LEASE_MS)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, 'Z');
+    this.ctx.storage.sql.exec(
+      "INSERT INTO counters (counter_key, used, reset_at) VALUES ('ai:inflight', 1, ?) " +
+        'ON CONFLICT(counter_key) DO UPDATE SET used = 1, reset_at = ?',
+      resetAt,
+      resetAt,
+    );
+  }
+
+  /** Always called from a `finally`, so a thrown path cannot strand the lease. */
+  private releaseAiLease(): void {
+    this.ctx.storage.sql.exec("DELETE FROM counters WHERE counter_key = 'ai:inflight'");
+  }
+
+  private reserveAiDayUnit(nowIso: string): void {
+    const key = `ai:event:${nowIso.slice(0, 10)}`;
+    const rows = this.ctx.storage.sql
+      .exec<{ used: number }>('SELECT used FROM counters WHERE counter_key = ?', key)
+      .toArray();
+    const used = rows[0]?.used ?? 0;
+    if (used >= AI_EVENT_DAY_LIMIT) {
+      throwApi('DEMO_CAPACITY', 'This event has used its AI drafts for today.');
+    }
+    const resetAt = `${nowIso.slice(0, 10)}T23:59:59Z`;
+    this.ctx.storage.sql.exec(
+      'INSERT INTO counters (counter_key, used, reset_at) VALUES (?, ?, ?) ' +
+        'ON CONFLICT(counter_key) DO UPDATE SET used = ?, reset_at = ?',
+      key,
+      used + 1,
+      resetAt,
+      used + 1,
+      resetAt,
+    );
+  }
+
+  /**
+   * `POST /v1/events/{id}/script-proposals` - owner.
+   *
+   * Four phases, and the ordering is the whole design:
+   *   1. reserve (sync, atomic)  - lease + per-event day unit, under expectedRevision
+   *   2. provider call (ASYNC)   - necessarily outside any transaction
+   *   3. commit (sync, atomic)   - re-check baseRevision, store, release
+   *   finally                    - release the lease on every path
+   *
+   * `transactionSync` is synchronous-only, so step 2 CANNOT accidentally be wrapped in a
+   * transaction. The structure enforces §12's rule rather than relying on discipline.
+   */
+  async proposeScript(
+    cmd: MutationEnvelope & { body: unknown; proposalId: string },
+    doFetch?: FetchLike,
+  ): Promise<CommandResponse> {
+    const parsed = scriptProposalBodySchema.safeParse(cmd.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throwApi(
+        'VALIDATION_FAILED',
+        `Invalid script request: ${issue === undefined ? 'unknown' : `${issue.path.join('.')} ${issue.message}`}`,
+      );
+    }
+    const request = parsed.data;
+
+    // ── phase 1: reserve ────────────────────────────────────────────────────────────
+    const prepared = this.ctx.storage.transactionSync(() => {
+      const replay = this.replayOrReject(cmd);
+      if (replay !== null) return { replay } as const;
+
+      const { state } = this.requireAccess(cmd.uid, 'owner');
+      const row = this.readStateRow() as StateRow;
+      this.requireRevision(row, request.expectedRevision);
+
+      if (request.cueId !== null && !state.cues.some((c) => c.id === request.cueId)) {
+        return throwApi('VALIDATION_FAILED', 'No such cue.') as never;
+      }
+      if (this.aiLeaseHeld(cmd.nowIso)) {
+        return throwApi(
+          'DEMO_CAPACITY',
+          'A draft is already being generated for this event. Try again shortly.',
+        ) as never;
+      }
+      this.reserveAiDayUnit(cmd.nowIso);
+      this.takeAiLease(cmd.nowIso);
+
+      const envelope = buildEnvelope(state, request.kind, request.language, request.cueId);
+      return { replay: null, envelope, baseRevision: state.revision } as const;
+    });
+
+    if (prepared.replay !== null) return prepared.replay;
+    const envelope: ScriptEnvelope = prepared.envelope;
+
+    try {
+      // ── phase 2: the provider, outside every transaction ──────────────────────────
+      const outcome = await generateScriptDraft(envelope, this.env, doFetch ?? fetch);
+
+      // ── phase 3: commit ───────────────────────────────────────────────────────────
+      return this.ctx.storage.transactionSync(() => {
+        const row = this.readStateRow();
+        if (row === null || row.deleted_at !== null) {
+          return throwApi('NOT_FOUND', 'Event not found.') as never;
+        }
+        const state = JSON.parse(row.state_json) as EventState;
+
+        const stale = state.revision !== prepared.baseRevision;
+        const expiresAt = new Date(Date.parse(cmd.nowIso) + PROPOSAL_TTL_MS)
+          .toISOString()
+          .replace(/\.\d{3}Z$/, 'Z');
+
+        this.ctx.storage.sql.exec(
+          'INSERT INTO proposals (id, kind, base_revision, input_json, result_json, status, created_by, created_at, expires_at) ' +
+            "VALUES (?, 'script', ?, ?, ?, ?, ?, ?, ?)",
+          cmd.proposalId,
+          prepared.baseRevision,
+          JSON.stringify({ ...request, promptVersion: PROMPT_VERSION, envelope }),
+          JSON.stringify(outcome),
+          stale ? 'stale' : 'proposed',
+          cmd.uid,
+          cmd.nowIso,
+          expiresAt,
+        );
+
+        if (stale) {
+          // The event moved while the provider was working. The draft is kept for the audit
+          // trail but cannot be approved; the organizer regenerates against the new revision.
+          return throwApi(
+            'PROPOSAL_STALE',
+            'The event changed while this draft was being generated. Generate a new one.',
+          ) as never;
+        }
+
+        const response: CommandResponse = {
+          status: 201,
+          body: {
+            proposalId: cmd.proposalId,
+            baseRevision: prepared.baseRevision,
+            body: outcome.body,
+            usedFactIds: outcome.usedFactIds,
+            warnings: outcome.warnings,
+            source: outcome.source,
+            model: outcome.model,
+            fallbackReason: outcome.fallbackReason,
+            approvedFacts: envelope.approvedFacts,
+            expiresAt,
+          },
+        };
+        this.recordCommand(cmd, response);
+        return response;
+      });
+    } finally {
+      // Runs on success, on rejection and on a provider throw. A crash before this is
+      // covered by the lease expiry instead.
+      this.ctx.storage.transactionSync(() => this.releaseAiLease());
+    }
+  }
+
+  /**
+   * `POST /v1/events/{id}/script-proposals/{pid}/approve` - owner.
+   *
+   * Stores the REVIEWED copy, which may differ from what was generated: review is mandatory
+   * and editing is expected. `source` records who generated it, so an edited Gemini draft is
+   * still `gemini` - downgrading it would erase the AI evidence the moment a human did the
+   * review §7B requires. `humanEdited` records the other fact separately.
+   */
+  async approveScript(
+    cmd: MutationEnvelope & { body: unknown; proposalId: string; inputHash: string },
+  ): Promise<CommandResponse> {
+    const parsed = scriptApproveBodySchema.safeParse(cmd.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throwApi(
+        'VALIDATION_FAILED',
+        `Invalid approval: ${issue === undefined ? 'unknown' : `${issue.path.join('.')} ${issue.message}`}`,
+      );
+    }
+    const request = parsed.data;
+
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replayOrReject(cmd);
+      if (replay !== null) return replay;
+
+      const { row, state } = this.requireAccess(cmd.uid, 'owner');
+      this.requireRevision(row, request.expectedRevision);
+
+      const rows = this.ctx.storage.sql
+        .exec<ProposalRow>(
+          "SELECT id, base_revision, input_json, result_json, status, expires_at FROM proposals WHERE id = ? AND kind = 'script'",
+          cmd.proposalId,
+        )
+        .toArray();
+      const proposal = rows[0];
+      if (proposal === undefined) return throwApi('NOT_FOUND', 'No such draft.') as never;
+      if (proposal.status === 'accepted') {
+        return throwApi('PROPOSAL_ALREADY_APPLIED', 'That draft was already approved.') as never;
+      }
+      if (proposal.status === 'stale' || proposal.base_revision !== state.revision) {
+        return throwApi('PROPOSAL_STALE', 'The event changed. Generate a new draft.') as never;
+      }
+      if (Date.parse(proposal.expires_at) <= Date.parse(cmd.nowIso)) {
+        return throwApi('PROPOSAL_EXPIRED', 'That draft expired. Generate a new one.') as never;
+      }
+
+      const input = JSON.parse(proposal.input_json) as {
+        kind: ScriptKind;
+        language: Language;
+        cueId: string | null;
+        envelope: ScriptEnvelope;
+        promptVersion: string;
+      };
+      const generated = JSON.parse(proposal.result_json) as {
+        body: string;
+        source: 'gemini' | 'template';
+        model: string | null;
+      };
+
+      // §12: approval repeats the fact-reference check. An id the organizer submits must
+      // still resolve against the facts that were supplied for this draft.
+      const supplied = new Set(input.envelope.approvedFacts.map((f) => f.id));
+      const unknownIds = request.usedFactIds.filter((id) => !supplied.has(id));
+      if (unknownIds.length > 0) {
+        return throwApi(
+          'VALIDATION_FAILED',
+          `These fact references are not part of this draft: ${unknownIds.join(', ')}`,
+        ) as never;
+      }
+
+      const script: ApprovedScript = {
+        id: cmd.proposalId,
+        cueId: input.cueId,
+        kind: input.kind,
+        language: input.language,
+        body: request.body,
+        usedFactIds: request.usedFactIds,
+        source: generated.source,
+        model: generated.model,
+        promptVersion: input.promptVersion,
+        inputHash: cmd.inputHash,
+        approvedBy: cmd.uid,
+        approvedAt: cmd.nowIso,
+      };
+
+      const next: EventState = {
+        ...state,
+        approvedScripts: [...state.approvedScripts, script],
+        revision: state.revision + 1,
+        updatedAt: cmd.nowIso,
+      };
+
+      const check = eventStateSchema.safeParse(next);
+      if (!check.success) {
+        return throwApi(
+          'VALIDATION_FAILED',
+          `Cannot approve: ${check.error.issues[0]?.message ?? 'invalid state'}`,
+        ) as never;
+      }
+
+      this.ctx.storage.sql.exec(
+        "UPDATE proposals SET status = 'accepted' WHERE id = ?",
+        cmd.proposalId,
+      );
+      // Draft phase leaves the published pointer null (§12).
+      const publishedRevision = state.phase === 'draft' ? row.published_revision : next.revision;
+      this.commitRevision(next, cmd.uid, 'script_approve', publishedRevision, cmd.nowIso);
+
+      const response: CommandResponse = {
+        status: 200,
+        body: { revision: next.revision, scriptId: script.id, publishedRevision },
+      };
+      this.recordCommand(cmd, response);
+      return response;
+    });
+  }
+
+  // ─────────────────────── Milestone 5: announcements ──────────────────────────────────
+
+  /** `POST /v1/events/{id}/announcements` - owner. Explicit publish IS the approval step. */
+  async publishAnnouncement(
+    cmd: MutationEnvelope & { body: unknown; announcementId: string },
+  ): Promise<CommandResponse> {
+    const parsed = announcementBodySchema.safeParse(cmd.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throwApi(
+        'VALIDATION_FAILED',
+        `Invalid announcement: ${issue === undefined ? 'unknown' : `${issue.path.join('.')} ${issue.message}`}`,
+      );
+    }
+    const request = parsed.data;
+
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replayOrReject(cmd);
+      if (replay !== null) return replay;
+
+      const { row, state } = this.requireAccess(cmd.uid, 'owner');
+      this.requireRevision(row, request.expectedRevision);
+
+      const announcement: Announcement = {
+        id: cmd.announcementId,
+        text: request.text,
+        language: request.language,
+        publishedAt: cmd.nowIso,
+        dismissedAt: null,
+      };
+      const next: EventState = {
+        ...state,
+        announcements: [...state.announcements, announcement],
+        revision: state.revision + 1,
+        updatedAt: cmd.nowIso,
+      };
+
+      const check = eventStateSchema.safeParse(next);
+      if (!check.success) {
+        return throwApi(
+          'VALIDATION_FAILED',
+          `Cannot publish: ${check.error.issues[0]?.message ?? 'invalid state'}`,
+        ) as never;
+      }
+
+      const publishedRevision = state.phase === 'draft' ? row.published_revision : next.revision;
+      this.commitRevision(next, cmd.uid, 'announcement', publishedRevision, cmd.nowIso);
+
+      const response: CommandResponse = {
+        status: 200,
+        body: { revision: next.revision, announcementId: announcement.id, publishedRevision },
+      };
+      this.recordCommand(cmd, response);
+      return response;
+    });
+  }
+
+  /** `POST /v1/events/{id}/announcements/{aid}/dismiss` - owner. Clears it in a new snapshot. */
+  async dismissAnnouncement(
+    cmd: MutationEnvelope & { body: unknown; announcementId: string },
+  ): Promise<CommandResponse> {
+    const parsed = expectedRevisionOnlySchema.safeParse(cmd.body);
+    if (!parsed.success) {
+      throwApi('VALIDATION_FAILED', 'Invalid body: expectedRevision is required.');
+    }
+    const expectedRevision = parsed.data.expectedRevision;
+
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replayOrReject(cmd);
+      if (replay !== null) return replay;
+
+      const { row, state } = this.requireAccess(cmd.uid, 'owner');
+      this.requireRevision(row, expectedRevision);
+
+      const target = state.announcements.find((a) => a.id === cmd.announcementId);
+      if (target === undefined) return throwApi('NOT_FOUND', 'No such announcement.') as never;
+      if (target.dismissedAt !== null) {
+        return throwApi('WRONG_PHASE', 'That announcement was already dismissed.') as never;
+      }
+
+      const next: EventState = {
+        ...state,
+        announcements: state.announcements.map((a) =>
+          a.id === cmd.announcementId ? { ...a, dismissedAt: cmd.nowIso } : a,
+        ),
+        revision: state.revision + 1,
+        updatedAt: cmd.nowIso,
+      };
+
+      const publishedRevision = state.phase === 'draft' ? row.published_revision : next.revision;
+      this.commitRevision(next, cmd.uid, 'announcement_dismiss', publishedRevision, cmd.nowIso);
+
+      const response: CommandResponse = {
+        status: 200,
+        body: { revision: next.revision, publishedRevision },
+      };
+      this.recordCommand(cmd, response);
+      return response;
+    });
   }
 
   /** Expiry cleanup at 72 hours. Alarms may repeat, so `purge` is idempotent. */

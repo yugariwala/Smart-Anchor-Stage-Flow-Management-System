@@ -10,7 +10,7 @@
  */
 
 import { ApiError, decodeApiError, type ErrorCode } from './http/errors';
-import { requestHash } from './http/canonicalJson';
+import { canonicalJson, requestHash, sha256Hex } from './http/canonicalJson';
 import {
   createTokenVerifier,
   remoteGoogleKeys,
@@ -33,11 +33,6 @@ const nowIso = (): string => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 const base64url = (bytes: Uint8Array): string =>
   btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-const sha256Hex = async (input: string): Promise<string> =>
-  [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input)))]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
 
 // ───────────────────────────────── CORS ────────────────────────────────────────────────
 
@@ -316,6 +311,69 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
   // GET /v1/events/{id}/repair-proposals/{pid}
   if (request.method === 'GET' && tail.length === 2 && tail[0] === 'repair-proposals') {
     const out = await viaRoom(stub.getProposal(uid, tail[1] as string, serverNow));
+    return respond(ctx, out.status, out.body);
+  }
+
+
+  // POST /v1/events/{id}/script-proposals
+  if (request.method === 'POST' && tail.length === 1 && tail[0] === 'script-proposals') {
+    const body = await readJsonBody(request);
+    const env0 = await envelope(request, uid, path, body, serverNow);
+    // Project cap first, so an event is never charged a per-event unit only to be refused by
+    // a project-wide condition. See docs/decisions.md for the over-admission trade.
+    await (
+      quotaRoom(env) as unknown as { admitAiAttempt(nowIso: string): Promise<void> }
+    )
+      .admitAiAttempt(serverNow)
+      .catch((cause: unknown) => {
+        throw decodeApiError(cause) ?? cause;
+      });
+    const out = await viaRoom(
+      stub.proposeScript({ ...env0, body, proposalId: crypto.randomUUID() }),
+    );
+    return respond(ctx, out.status, out.body);
+  }
+
+  // POST /v1/events/{id}/script-proposals/{pid}/approve
+  if (
+    request.method === 'POST' &&
+    tail.length === 3 &&
+    tail[0] === 'script-proposals' &&
+    tail[2] === 'approve'
+  ) {
+    const body = await readJsonBody(request);
+    const env0 = await envelope(request, uid, path, body, serverNow);
+    // §12 requires an inputHash on the stored script. Hashing is async, so it happens here,
+    // outside the transaction, exactly like the idempotency hash.
+    const inputHash = await sha256Hex(canonicalJson({ proposalId: tail[1], body }));
+    const out = await viaRoom(
+      stub.approveScript({ ...env0, body, proposalId: tail[1] as string, inputHash }),
+    );
+    return respond(ctx, out.status, out.body);
+  }
+
+  // POST /v1/events/{id}/announcements
+  if (request.method === 'POST' && tail.length === 1 && tail[0] === 'announcements') {
+    const body = await readJsonBody(request);
+    const env0 = await envelope(request, uid, path, body, serverNow);
+    const out = await viaRoom(
+      stub.publishAnnouncement({ ...env0, body, announcementId: crypto.randomUUID() }),
+    );
+    return respond(ctx, out.status, out.body);
+  }
+
+  // POST /v1/events/{id}/announcements/{aid}/dismiss
+  if (
+    request.method === 'POST' &&
+    tail.length === 3 &&
+    tail[0] === 'announcements' &&
+    tail[2] === 'dismiss'
+  ) {
+    const body = await readJsonBody(request);
+    const env0 = await envelope(request, uid, path, body, serverNow);
+    const out = await viaRoom(
+      stub.dismissAnnouncement({ ...env0, body, announcementId: tail[1] as string }),
+    );
     return respond(ctx, out.status, out.body);
   }
 

@@ -77,12 +77,22 @@ export class QuotaRoom extends DurableObject<Env> {
     });
   }
 
-  /** AI admission and the per-event in-flight lease belong to the Gemini adapter. */
-  async admitAiAttempt(_eventId: string, _nowIso: string): Promise<never> {
-    throw new Error('not implemented: Milestone 4');
-  }
-
-  async releaseAiInflight(_eventId: string): Promise<never> {
-    throw new Error('not implemented: Milestone 4');
+  /**
+   * Project-wide AI admission. The per-event day cap and the in-flight lease live in the
+   * EventRoom, because they are per-event state; only this cap is shared.
+   *
+   * ORDERING TRADE (docs/decisions.md): the Worker reserves here FIRST, before the EventRoom
+   * takes its per-event day unit, so an event is never charged a unit only to be refused by a
+   * project-wide condition. The cost is that concurrent requests can over-admit this cap by at
+   * most (concurrent - 1), which §12 already allows: "application caps are deliberately lower
+   * than provider quotas; they do not guarantee uninterrupted service".
+   *
+   * A unit is consumed per ATTEMPT, including a retry, per §11. A failed attempt still cost
+   * the provider something.
+   */
+  async admitAiAttempt(nowIso: string): Promise<void> {
+    this.ctx.storage.transactionSync(() => {
+      this.reserveSync(`ai:project:${utcDay(nowIso)}`, QUOTA_LIMITS.aiProjectDay, nowIso);
+    });
   }
 }
