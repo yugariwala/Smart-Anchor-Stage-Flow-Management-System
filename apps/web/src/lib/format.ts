@@ -11,13 +11,18 @@ const KOLKATA_OFFSET_MIN = 330;
 
 /** A minute offset from `startsAt`, rendered as HH:MM in the event timezone. */
 export const localTime = (startsAt: string, minuteOffset: number): string => {
-  const at = new Date(Date.parse(startsAt) + (minuteOffset + KOLKATA_OFFSET_MIN) * 60_000);
-  const p = (n: number): string => String(n).padStart(2, '0');
+  const at = new Date(
+    Date.parse(startsAt) + (minuteOffset + KOLKATA_OFFSET_MIN) * 60_000,
+  );
+  const p = (n: number): string => String(n).padStart(2, "0");
   return `${p(at.getUTCHours())}:${p(at.getUTCMinutes())}`;
 };
 
 /** An ISO instant, rendered as HH:MM in the event timezone. */
 export const localTimeOf = (startsAt: string, iso: string): string =>
-  localTime(startsAt, Math.round((Date.parse(iso) - Date.parse(startsAt)) / 60_000));
+  localTime(
+    startsAt,
+    Math.round((Date.parse(iso) - Date.parse(startsAt)) / 60_000),
+  );
 
 export const signedMinutes = (n: number): string => (n > 0 ? `+${n}` : `${n}`);

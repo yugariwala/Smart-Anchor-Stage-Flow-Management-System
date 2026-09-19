@@ -8,8 +8,13 @@ dist/
 .env.*
 !.env.example
 coverage/
+test-results/
+playwright-report/
 *.local
 .DS_Store
 
 # Credentials handed over for local setup — never committed
 firebase-config.txt
+
+# Scratch output from fixture tooling
+.fixture-source.tmp

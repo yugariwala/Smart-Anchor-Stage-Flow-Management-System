@@ -18,10 +18,17 @@
  * Found by a live browser run: a reload was producing a new uid and orphaning the event.
  */
 
-import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInAnonymously, type Auth, type User } from 'firebase/auth';
+import { initializeApp, type FirebaseApp } from "firebase/app";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInAnonymously,
+  signOut as firebaseSignOut,
+  type Auth,
+  type User,
+} from "firebase/auth";
 
-import { config } from './env';
+import { config } from "./env";
 
 let app: FirebaseApp | null = null;
 let pending: Promise<User> | null = null;
@@ -50,8 +57,9 @@ export const signIn = async (): Promise<User> => {
   return pending;
 };
 
-export const watchUser = (onChange: (user: User | null) => void): (() => void) =>
-  onAuthStateChanged(firebaseAuth(), onChange);
+export const watchUser = (
+  onChange: (user: User | null) => void,
+): (() => void) => onAuthStateChanged(firebaseAuth(), onChange);
 
 /**
  * A fresh ID token for the Authorization header.
@@ -62,4 +70,9 @@ export const watchUser = (onChange: (user: User | null) => void): (() => void) =
 export const idToken = async (): Promise<string> => {
   const user = await signIn();
   return user.getIdToken();
+};
+
+export const signOut = async (): Promise<void> => {
+  await firebaseSignOut(firebaseAuth());
+  pending = null;
 };

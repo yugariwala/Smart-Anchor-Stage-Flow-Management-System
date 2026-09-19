@@ -6,17 +6,17 @@
  * claim a rehearsal, so the mode is shown instead of inventing a variant of the label.
  */
 
-export function RehearsalBanner({ mode }: { mode: 'rehearsal' | 'live' }) {
-  if (mode === 'rehearsal') {
+export function RehearsalBanner({ mode }: { mode: "rehearsal" | "live" }) {
+  if (mode === "rehearsal") {
     return (
       <div className="rehearsal-banner" role="note">
-        REHEARSAL {'·'} fictional event and speakers {'·'} scenario clock.
+        REHEARSAL {"·"} fictional event and speakers {"·"} scenario clock.
       </div>
     );
   }
   return (
     <div className="rehearsal-banner" role="note">
-      LIVE MODE {'·'} actual times come from the server clock.
+      LIVE MODE {"·"} actual times come from the server clock.
     </div>
   );
 }

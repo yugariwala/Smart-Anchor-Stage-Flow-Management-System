@@ -15,12 +15,17 @@
     "build": "npm run build --workspaces --if-present",
     "deploy:api": "npm run deploy -w @cuepilot/api",
     "lint": "npm run lint --workspaces --if-present",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm test",
+    "test:ui": "vitest run --config apps/web/vitest.config.ts",
+    "test:e2e": "playwright test --config apps/web/playwright.config.ts"
   },
   "devDependencies": {
     "oxlint": "^1.83.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11",
     "wrangler": "^4.135.0"
+  },
+  "dependencies": {
+    "@radix-ui/themes": "^3.3.0"
   }
 }

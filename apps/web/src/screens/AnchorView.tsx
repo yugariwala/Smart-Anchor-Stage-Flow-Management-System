@@ -10,31 +10,46 @@
  * only revision changes.
  */
 
-import { renderOperationalCue } from '@cuepilot/domain';
-import { useEffect, useRef, useState } from 'react';
+import { renderOperationalCue } from "@cuepilot/domain";
+import { useEffect, useRef, useState } from "react";
+import {
+  FileTextIcon,
+  ReloadIcon,
+  EnterFullScreenIcon,
+} from "@radix-ui/react-icons";
 
-import { acknowledge, errorCopy } from '../lib/api';
-import { useSnapshotPoll } from '../lib/useSnapshotPoll';
-import { FreshnessChip, StaleSnapshotNotice } from '../components/Freshness';
-import { RehearsalBanner } from '../components/RehearsalBanner';
+import { acknowledge, errorCopy } from "../lib/api";
+import { useSnapshotPoll } from "../lib/useSnapshotPoll";
+import { FreshnessChip, StaleSnapshotNotice } from "../components/Freshness";
+import { RehearsalBanner } from "../components/RehearsalBanner";
+import { rememberEvent } from "../lib/storage";
+import { RunbookTable } from "./EventPages";
 
 const mmss = (totalSeconds: number): string => {
-  const sign = totalSeconds < 0 ? '-' : '';
+  const sign = totalSeconds < 0 ? "-" : "";
   const s = Math.abs(totalSeconds);
   const m = Math.floor(s / 60);
-  return `${sign}${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  return `${sign}${String(m).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
 
-export function AnchorView({ eventId }: { eventId: string }) {
+export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
   const poll = useSnapshotPoll(eventId);
   const [ackedRevision, setAckedRevision] = useState<number | null>(null);
-  const [ackError, setAckError] = useState<string>('');
+  const [ackError, setAckError] = useState<string>("");
   const [ackPending, setAckPending] = useState(false);
-  const [announcement, setAnnouncement] = useState('');
+  const [announcement, setAnnouncement] = useState("");
   const lastAnnounced = useRef<number | null>(null);
+  const [displayError, setDisplayError] = useState("");
 
   const snapshot = poll.snapshot;
   const revision = snapshot?.publishedRevision ?? null;
+  useEffect(() => {
+    if (snapshot)
+      rememberEvent(
+        snapshot.state,
+        snapshot.state.ownerUid === uid ? "owner" : "anchor",
+      );
+  }, [snapshot, uid]);
 
   // Polite announcement on a NEW revision only — never a per-second timer (§20).
   useEffect(() => {
@@ -42,13 +57,15 @@ export function AnchorView({ eventId }: { eventId: string }) {
     const first = lastAnnounced.current === null;
     lastAnnounced.current = revision;
     setAnnouncement(
-      first ? `Runbook loaded, revision ${revision}.` : `Updated: revision ${revision} published.`,
+      first
+        ? `Runbook loaded, revision ${revision}.`
+        : `Updated: revision ${revision} published.`,
     );
   }, [revision]);
 
   if (snapshot === null) {
     return (
-      <main className="anchor">
+      <div className="anchor">
         <h1 className="anchor-title">CuePilot</h1>
         {poll.notPublished ? (
           <p className="anchor-line" role="status">
@@ -60,28 +77,42 @@ export function AnchorView({ eventId }: { eventId: string }) {
           </p>
         ) : (
           <p className="anchor-line" role="status">
-            Loading the published runbook{'…'}
+            Loading the published runbook{"…"}
           </p>
         )}
-      </main>
+        <div className="row">
+          <button onClick={poll.refresh}>Retry connection</button>
+          <a className="button-link" href="#/">
+            Back to events
+          </a>
+        </div>
+      </div>
     );
   }
 
   const state = snapshot.state;
   // The scenario clock in rehearsal, otherwise the server clock estimated locally.
   const nowAt =
-    state.mode === 'rehearsal' && state.scenarioNowAt !== null
+    state.mode === "rehearsal" && state.scenarioNowAt !== null
       ? state.scenarioNowAt
       : poll.serverNowIso;
   const view = renderOperationalCue(state, nowAt);
 
   const secondsLeft =
-    view.current === null ? null : (view.current.endMin - view.nowMin) * 60;
-  const behind = ackedRevision !== null && ackedRevision < snapshot.publishedRevision;
+    view.current === null
+      ? null
+      : Math.ceil(
+          (Date.parse(state.startsAt) +
+            view.current.endMin * 60_000 -
+            Date.parse(nowAt)) /
+            1000,
+        );
+  const behind =
+    ackedRevision !== null && ackedRevision < snapshot.publishedRevision;
 
   const onAcknowledge = async (): Promise<void> => {
     setAckPending(true);
-    setAckError('');
+    setAckError("");
     try {
       const result = await acknowledge(eventId, snapshot.publishedRevision);
       if (result !== null) setAckedRevision(result.acknowledgedRevision);
@@ -93,19 +124,67 @@ export function AnchorView({ eventId }: { eventId: string }) {
   };
 
   return (
-    <main className="anchor">
+    <div className="anchor">
       <RehearsalBanner mode={state.mode} />
+      <header className="anchor-header">
+        <div>
+          <p className="anchor-label">ANCHOR RUNBOOK</p>
+          <h2>{state.name}</h2>
+        </div>
+        <div className="row no-print">
+          <button
+            className="icon-button"
+            onClick={poll.refresh}
+            aria-label="Refresh runbook"
+          >
+            <ReloadIcon />
+          </button>
+          <button
+            className="icon-button"
+            onClick={() => window.print()}
+            aria-label="Print runbook"
+          >
+            <FileTextIcon />
+          </button>
+          <button
+            className="icon-button"
+            aria-label="Toggle fullscreen"
+            onClick={() => {
+              const action = document.fullscreenElement
+                ? document.exitFullscreen()
+                : document.documentElement.requestFullscreen();
+              void action.catch(() =>
+                setDisplayError("Fullscreen is unavailable in this browser."),
+              );
+            }}
+          >
+            <EnterFullScreenIcon />
+          </button>
+        </div>
+      </header>
+      {state.ownerUid === uid && (
+        <p className="notice small no-print">
+          Organizer preview. Only an invited anchor can acknowledge this
+          runbook. <a href={`#/event/${eventId}/console`}>Return to console</a>
+        </p>
+      )}
+      {displayError && <p role="status">{displayError}</p>}
 
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
 
       <div className="row spread">
-        <FreshnessChip freshness={poll.freshness} revision={snapshot.publishedRevision} />
-        {view.scheduleHealth === 'needs_repair' ? (
+        <FreshnessChip
+          freshness={poll.freshness}
+          revision={snapshot.publishedRevision}
+        />
+        {view.scheduleHealth === "needs_repair" ? (
           <span className="chip chip-warn">Schedule needs repair</span>
         ) : null}
-        {poll.fromCache ? <span className="chip chip-bad">Cached copy</span> : null}
+        {poll.fromCache ? (
+          <span className="chip chip-bad">Cached copy</span>
+        ) : null}
       </div>
 
       <StaleSnapshotNotice
@@ -118,19 +197,25 @@ export function AnchorView({ eventId }: { eventId: string }) {
         <p className="anchor-label">Now</p>
         {view.current === null ? (
           <>
-            <h1 className="anchor-title">{state.phase === 'ended' ? 'Event complete' : 'Between cues'}</h1>
-            {state.phase === 'ended' ? null : (
-              <p className="anchor-time muted">Waiting for the organizer to start the next cue.</p>
+            <h1 className="anchor-title">
+              {state.phase === "ended" ? "Event complete" : "Between cues"}
+            </h1>
+            {state.phase === "ended" ? null : (
+              <p className="anchor-time muted">
+                Waiting for the organizer to start the next cue.
+              </p>
             )}
           </>
         ) : (
           <>
             <h1 className="anchor-title">{view.current.title}</h1>
             <p className="anchor-time">
-              {view.current.startsAtLocal}{'–'}{view.current.endsAtLocal}
+              {view.current.startsAtLocal}
+              {"–"}
+              {view.current.endsAtLocal}
               {secondsLeft === null ? null : (
                 <>
-                  {' '}
+                  {" "}
                   <span aria-hidden="true">({mmss(secondsLeft)} left)</span>
                 </>
               )}
@@ -155,20 +240,68 @@ export function AnchorView({ eventId }: { eventId: string }) {
 
       <section className="anchor-now">
         <p className="anchor-label">Approved script</p>
-        <p className="muted">
-          Approved host copy appears here once the organizer reviews and approves it.
-        </p>
+        {state.approvedScripts.filter(
+          (script) =>
+            script.cueId === null ||
+            script.cueId === view.current?.cueId ||
+            (view.current === null && script.cueId === view.next?.cueId),
+        ).length === 0 ? (
+          <p className="muted">
+            No approved copy for this cue. Script generation and approval are
+            not available in this build.
+          </p>
+        ) : (
+          state.approvedScripts
+            .filter(
+              (script) =>
+                script.cueId === null ||
+                script.cueId === view.current?.cueId ||
+                (view.current === null && script.cueId === view.next?.cueId),
+            )
+            .map((script) => (
+              <article key={script.id}>
+                <p className="script-body" lang={script.language}>
+                  {script.body}
+                </p>
+                <p className="small muted">
+                  {script.source === "template"
+                    ? "Template fallback — AI unavailable."
+                    : script.source === "gemini"
+                      ? "AI-generated copy · reviewed and approved"
+                      : "Human-written copy"}{" "}
+                  · {script.language.toUpperCase()}
+                </p>
+              </article>
+            ))
+        )}
       </section>
 
-      <div className="row">
+      {state.announcements
+        .filter((a) => a.dismissedAt === null)
+        .map((a) => (
+          <section className="anchor-now announcement-banner" key={a.id}>
+            <p className="anchor-label">Announcement</p>
+            <p lang={a.language} className="script-body">
+              {a.text}
+            </p>
+          </section>
+        ))}
+
+      <div className="row no-print">
         <button
           type="button"
           className="primary"
           onClick={() => void onAcknowledge()}
-          disabled={ackPending || ackedRevision === snapshot.publishedRevision}
+          disabled={
+            ackPending ||
+            ackedRevision === snapshot.publishedRevision ||
+            poll.freshness !== "live" ||
+            poll.fromCache ||
+            state.ownerUid === uid
+          }
         >
           {ackPending
-            ? 'Acknowledging…'
+            ? "Acknowledging…"
             : ackedRevision === snapshot.publishedRevision
               ? `Acknowledged revision ${snapshot.publishedRevision}`
               : `Acknowledge revision ${snapshot.publishedRevision}`}
@@ -179,16 +312,56 @@ export function AnchorView({ eventId }: { eventId: string }) {
           </span>
         ) : null}
       </div>
-      {ackError === '' ? null : (
+      {ackError === "" ? null : (
         <p className="notice notice-bad small" role="alert">
           {ackError}
         </p>
       )}
 
       <p className="muted small">
-        Acknowledgement confirms you received this revision. It does not confirm the words have
-        been spoken.
+        Acknowledgement confirms you received this revision. It does not confirm
+        the words have been spoken.
       </p>
-    </main>
+      <section className="anchor-now runbook-full">
+        <p className="anchor-label">Complete published agenda</p>
+        <RunbookTable state={state} />
+      </section>
+      <section className="print-only">
+        <h2>All approved host copy</h2>
+        {state.approvedScripts.map((script) => (
+          <article key={script.id}>
+            <h3>
+              {state.cues.find((cue) => cue.id === script.cueId)?.title ??
+                script.kind}
+            </h3>
+            <p className="script-body" lang={script.language}>
+              {script.body}
+            </p>
+            <p>
+              {script.source} · Approved {script.approvedAt}
+            </p>
+          </article>
+        ))}
+        <h2>Speaker pronunciation & facts</h2>
+        {state.speakers.map((speaker) => (
+          <article key={speaker.id}>
+            <h3>{speaker.displayName}</h3>
+            <p>{speaker.pronunciationHint}</p>
+            <ul>
+              {speaker.facts.map((fact) => (
+                <li key={fact.id}>{fact.text}</li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </section>
+      <footer className="small muted">
+        Published revision {snapshot.publishedRevision} · Last synced{" "}
+        {poll.lastSyncAt
+          ? new Date(poll.lastSyncAt).toLocaleString()
+          : "not synced"}{" "}
+        · Times in IST. Printed copies do not update.
+      </footer>
+    </div>
   );
 }

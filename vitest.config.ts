@@ -5,6 +5,6 @@ import { defineConfig } from 'vitest/config'
 // workerd via @cloudflare/vitest-pool-workers. Nothing about the DO is mocked.
 export default defineConfig({
   test: {
-    projects: ['packages/domain/vitest.config.ts', 'apps/api/vitest.config.ts'],
+    projects: ['packages/domain/vitest.config.ts', 'apps/api/vitest.config.ts', 'apps/web/vitest.config.ts'],
   },
 })

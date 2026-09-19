@@ -6,11 +6,11 @@
  * stale view can never be mistaken for a live one.
  */
 
-import type { Freshness } from '../lib/useSnapshotPoll';
+import type { Freshness } from "../lib/useSnapshotPoll";
 
 const hhmmss = (ms: number): string => {
   const d = new Date(ms);
-  const p = (n: number): string => String(n).padStart(2, '0');
+  const p = (n: number): string => String(n).padStart(2, "0");
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 };
 
@@ -22,13 +22,21 @@ export function FreshnessChip({
   revision: number | null;
 }) {
   const label =
-    freshness === 'live' ? 'Live' : freshness === 'amber' ? 'Syncing' : 'Updates paused';
+    freshness === "live"
+      ? "Live"
+      : freshness === "amber"
+        ? "Syncing"
+        : "Updates paused";
   const cls =
-    freshness === 'live' ? 'chip-ok' : freshness === 'amber' ? 'chip-warn' : 'chip-bad';
+    freshness === "live"
+      ? "chip-ok"
+      : freshness === "amber"
+        ? "chip-warn"
+        : "chip-bad";
   return (
     <span className={`chip ${cls}`}>
       {label}
-      {revision === null ? '' : ` · revision ${revision}`}
+      {revision === null ? "" : ` · revision ${revision}`}
     </span>
   );
 }
@@ -46,14 +54,15 @@ export function StaleSnapshotNotice({
   revision: number | null;
   lastSyncAt: number | null;
 }) {
-  if (freshness !== 'stale') return null;
+  if (freshness !== "stale") return null;
   return (
     <p className="notice notice-bad small" role="status">
-      Offline snapshot {'·'} revision {revision ?? '—'} {'·'} last synced{' '}
-      {lastSyncAt === null ? 'never' : hhmmss(lastSyncAt)}. Updates paused.
+      Offline snapshot {"·"} revision {revision ?? "—"} {"·"} last synced{" "}
+      {lastSyncAt === null ? "never" : hhmmss(lastSyncAt)}. Updates paused.
       <br />
       <span className="small">
-        Any countdown shown is an estimate from cached timing, not live coordination.
+        Any countdown shown is an estimate from cached timing, not live
+        coordination.
       </span>
     </p>
   );

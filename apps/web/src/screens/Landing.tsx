@@ -1,138 +1,568 @@
-/**
- * Landing. Anonymous sign-in, then create a personal rehearsal event.
- *
- * §13: expiry and demo-capacity limits are shown before an organizer invests any work, and
- * the anonymous-identity caveat is stated rather than buried.
- */
+import { useEffect, useRef, useState } from "react";
+import {
+  PlusIcon,
+  ArrowRightIcon,
+  MagnifyingGlassIcon,
+  CalendarIcon,
+  ArrowTopRightIcon,
+  Link2Icon,
+} from "@radix-ui/react-icons";
+import { Button } from "@radix-ui/themes";
+import type { EventState } from "@cuepilot/domain";
+import {
+  createEvent,
+  getEvent,
+  getPublished,
+  errorCopy,
+  ApiCallError,
+  type CreateBody,
+} from "../lib/api";
+import { navigate, parseRoute } from "../lib/route";
+import {
+  recentEvents,
+  rememberEvent,
+  forgetEvent,
+  type RecentEvent,
+} from "../lib/storage";
+import { useCommand } from "../lib/useCommand";
+import {
+  CommandNotice,
+  EmptyState,
+  Modal,
+  PageHeading,
+} from "../components/UI";
 
-import { useState } from 'react';
-
-import { createEvent, errorCopy, health, type Health } from '../lib/api';
-import { navigate } from '../lib/route';
-import { useCommand } from '../lib/useCommand';
-
-/** 10:00 IST on the fixture's date, expressed in UTC. */
-const FIXTURE_START = '2026-09-19T04:30:00Z';
-
+const startDefault = () =>
+  new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10) + "T10:00";
 export function Landing({ uid }: { uid: string }) {
   const command = useCommand();
-  const [status, setStatus] = useState<Health | null>(null);
-  const [checked, setChecked] = useState(false);
-  const [healthError, setHealthError] = useState('');
-  const [joinUrl, setJoinUrl] = useState('');
-
-  const checkHealth = async (): Promise<void> => {
-    setChecked(false);
-    setHealthError('');
-    try {
-      setStatus(await health());
-    } catch (cause) {
-      setHealthError(errorCopy(cause));
-    } finally {
-      setChecked(true);
+  const [events, setEvents] = useState<RecentEvent[]>(recentEvents);
+  const [states, setStates] = useState<Record<string, EventState>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [checking, setChecking] = useState(true);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [start, setStart] = useState(startDefault);
+  const [duration, setDuration] = useState("60");
+  const [mode, setMode] = useState<"rehearsal" | "live">("rehearsal");
+  const [joinUrl, setJoinUrl] = useState("");
+  const [openId, setOpenId] = useState("");
+  const [formError, setFormError] = useState("");
+  const [opening, setOpening] = useState(false);
+  const createdId = useRef("");
+  const busy = command.status === "pending" || command.status === "unknown";
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.allSettled(
+      events.map(async (event) => {
+        try {
+          const result =
+            event.role === "owner"
+              ? await getEvent(event.id)
+              : await getPublished(event.id, null);
+          if (result && !cancelled)
+            setStates((current) => ({ ...current, [event.id]: result.state }));
+        } catch (cause) {
+          if (!cancelled)
+            setErrors((current) => ({
+              ...current,
+              [event.id]:
+                cause instanceof ApiCallError && cause.code === "NOT_PUBLISHED"
+                  ? "Waiting for publication"
+                  : errorCopy(cause),
+            }));
+        }
+      }),
+    ).then(() => {
+      if (!cancelled) setChecking(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [events]);
+  const finishCreation = (result: { state: EventState } | null) => {
+    if (result) {
+      rememberEvent(result.state, "owner");
+      navigate(`#/event/${result.state.id}/setup`);
     }
   };
-
-  const create = async (): Promise<void> => {
-    const eventId = crypto.randomUUID();
-    const result = await command.run(`create:${eventId}`, (key) =>
-      createEvent(
-        eventId,
-        {
-          name: 'TechFest 2026 — Inaugural Session',
-          startsAt: FIXTURE_START,
-          hardEndMin: 60,
-          mode: 'rehearsal',
-          seed: 'blank',
-        },
-        key,
+  const create = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setFormError("");
+    if (
+      !name.trim() ||
+      !start ||
+      !Number.isInteger(Number(duration)) ||
+      Number(duration) < 1 ||
+      Number(duration) > 240
+    ) {
+      setFormError(
+        "Enter an event name, a start time, and a duration from 1 to 240 minutes.",
+      );
+      return;
+    }
+    const startsAt = new Date(start + ":00+05:30");
+    if (!Number.isFinite(startsAt.getTime())) {
+      setFormError("Choose a valid event start time.");
+      return;
+    }
+    createdId.current = crypto.randomUUID();
+    const body: CreateBody = {
+      name: name.trim(),
+      startsAt: startsAt.toISOString().replace(".000Z", "Z"),
+      hardEndMin: Number(duration),
+      mode,
+      seed: "blank",
+    };
+    finishCreation(
+      await command.run("create", (key) =>
+        createEvent(createdId.current, body, key),
       ),
     );
-    if (result !== null) navigate(`#/event/${eventId}/setup`);
   };
-
-  const openJoinLink = (): void => {
-    const trimmed = joinUrl.trim();
-    if (trimmed.length === 0) return;
-    const hash = trimmed.includes('#') ? trimmed.slice(trimmed.indexOf('#')) : trimmed;
-    window.location.hash = hash;
+  const join = (event: React.FormEvent) => {
+    event.preventDefault();
+    setFormError("");
+    const hash = joinUrl.includes("#")
+      ? joinUrl.slice(joinUrl.indexOf("#"))
+      : joinUrl;
+    if (parseRoute(hash).kind !== "join" || !hash.includes("code=")) {
+      setFormError("Paste the complete invitation link, including its code.");
+      return;
+    }
+    navigate(hash);
   };
-
+  const open = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setFormError("");
+    const id = openId.trim();
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(id)) {
+      setFormError("Enter a valid event ID.");
+      return;
+    }
+    setOpening(true);
+    try {
+      try {
+        const result = await getEvent(id);
+        if (result) {
+          navigate(`#/event/${id}/console`);
+          return;
+        }
+      } catch (cause) {
+        if (
+          !(cause instanceof ApiCallError) ||
+          !["NOT_FOUND", "FORBIDDEN_ROLE"].includes(cause.code)
+        )
+          throw cause;
+      }
+      try {
+        const result = await getPublished(id, null);
+        if (result)
+          rememberEvent(
+            result.state,
+            result.state.ownerUid === uid ? "owner" : "anchor",
+          );
+      } catch (cause) {
+        if (!(cause instanceof ApiCallError) || cause.code !== "NOT_PUBLISHED")
+          throw cause;
+      }
+      navigate(`#/anchor/${id}`);
+    } catch (cause) {
+      setFormError(errorCopy(cause));
+    } finally {
+      setOpening(false);
+    }
+  };
+  const filtered = events.filter(
+    (e) =>
+      e.name.toLowerCase().includes(query.toLowerCase()) &&
+      (filter === "all" ||
+        (filter === "anchor"
+          ? e.role === "anchor"
+          : states[e.id]?.phase === filter)),
+  );
   return (
-    <div className="page">
-      <h1>CuePilot</h1>
-      <p>
-        When a segment overruns, CuePilot calculates a plan that protects fixed commitments and
-        the hard finish, explains it, and publishes one approved revision to every screen at
-        once {'—'} or refuses, with the shortage quantified.
-      </p>
-
-      <div className="card">
-        <h2>Try the fictional rehearsal</h2>
-        <p className="small muted">
-          Signed in anonymously as <span className="mono">{uid}</span>.
-        </p>
-        <ul className="small">
-          <li>The event, speakers and agenda are fictional. The clock is a scenario clock.</li>
-          <li>Demo data is deleted automatically after 72 hours.</li>
-          <li>
-            Capacity limits apply: two new events per identity per day, and a shared project
-            cap. A limit message is a real limit, not a failure.
-          </li>
-          <li>
-            Anonymous identity is not a durable account. Clearing browser storage loses access
-            to events it created. Do not use a shared device.
-          </li>
-        </ul>
-        <div className="row">
-          <button
-            type="button"
-            className="primary"
-            onClick={() => void create()}
-            disabled={command.status === 'pending'}
-          >
-            {command.status === 'pending' ? 'Creating…' : 'Create a rehearsal event'}
-          </button>
-          <button type="button" onClick={() => void checkHealth()}>
-            Check API
-          </button>
+    <div className="page workspace-page">
+      <PageHeading
+        title="Your events"
+        description="A clear plan. A connected team. A stage under control."
+        actions={
+          <>
+            <button
+              onClick={() => {
+                setJoinOpen(true);
+                setFormError("");
+              }}
+            >
+              <Link2Icon /> Join an event
+            </button>
+            <Button
+              size="3"
+              onClick={() => {
+                setCreateOpen(true);
+                setFormError("");
+              }}
+            >
+              <PlusIcon /> Create event
+            </Button>
+          </>
+        }
+      />
+      <section className="workspace-intro">
+        <div>
+          <span className="intro-label">
+            <span className="status-dot" /> YOUR STAGE, IN SYNC
+          </span>
+          <h2>
+            Keep the show
+            <br />
+            moving together.
+          </h2>
+          <p>
+            Prepare your rundown, protect your timing,
+            <br className="desktop-only" /> and keep your anchor on the same
+            page.
+          </p>
+          <a href="#/help" className="text-link">
+            Explore the workflow <ArrowRightIcon />
+          </a>
         </div>
-        {command.message === '' ? null : (
-          <p className="notice notice-bad small" role="alert">
-            {command.message}
-          </p>
-        )}
-        {!checked ? null : healthError !== '' ? (
-          <p className="notice notice-bad small" role="status">
-            {healthError}
-          </p>
-        ) : (
-          <p className="notice small" role="status">
-            API reachable {'·'} build <span className="mono">{status?.buildCommit}</span>
-          </p>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Joining as an anchor?</h2>
-        <p className="small muted">
-          Paste the invitation link the organizer sent you. The secret travels in the link
-          fragment and is never sent to the server.
-        </p>
-        <div className="field">
-          <label htmlFor="joinUrl">Invitation link</label>
+        <div
+          className="workflow-visual"
+          aria-label="Workflow: prepare, publish, perform"
+        >
+          <div className="visual-track">
+            <span>01</span>
+            <div>
+              <strong>Prepare</strong>
+              <small>Every cue in its place</small>
+            </div>
+            <CalendarIcon />
+          </div>
+          <div className="visual-connector" />
+          <div className="visual-track visual-active">
+            <span>02</span>
+            <div>
+              <strong>Publish</strong>
+              <small>One approved runbook</small>
+            </div>
+            <span className="status-dot" />
+          </div>
+          <div className="visual-connector" />
+          <div className="visual-track">
+            <span>03</span>
+            <div>
+              <strong>Perform</strong>
+              <small>Everyone on the same cue</small>
+            </div>
+            <ArrowTopRightIcon />
+          </div>
+        </div>
+      </section>
+      <div className="section-toolbar">
+        <div className="segmented" role="group" aria-label="Filter events">
+          {[
+            ["all", "All events"],
+            ["draft", "Drafts"],
+            ["running", "Running"],
+            ["anchor", "Joined"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              aria-pressed={filter === value}
+              className={filter === value ? "selected" : ""}
+              onClick={() => setFilter(value ?? "all")}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="search-field">
+          <MagnifyingGlassIcon />
           <input
-            id="joinUrl"
-            type="text"
-            value={joinUrl}
-            onChange={(e) => setJoinUrl(e.target.value)}
-            placeholder="https://.../#/join/..."
+            aria-label="Search events"
+            placeholder="Search your events…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
           />
-        </div>
-        <button type="button" onClick={openJoinLink} disabled={joinUrl.trim().length === 0}>
-          Open invitation
-        </button>
+        </label>
       </div>
+      <div className="row spread small muted collection-heading">
+        <span>
+          {filtered.length} {filtered.length === 1 ? "event" : "events"} in this
+          browser
+        </span>
+        <span>
+          {checking
+            ? "Checking latest status…"
+            : "Status verified with your server"}
+        </span>
+      </div>
+      {filtered.length === 0 ? (
+        <section className="card">
+          <EmptyState
+            title={
+              events.length
+                ? "No matching events"
+                : "Your next event starts here"
+            }
+            description={
+              events.length
+                ? "Try a different search or filter to find your event."
+                : "Create an event to build your agenda, or join your organizer’s invitation."
+            }
+            action={
+              events.length > 0 ? (
+                <button
+                  onClick={() => {
+                    setQuery("");
+                    setFilter("all");
+                  }}
+                >
+                  Clear filters
+                </button>
+              ) : (
+                <Button onClick={() => setCreateOpen(true)}>
+                  <PlusIcon /> Create event
+                </Button>
+              )
+            }
+          />
+        </section>
+      ) : (
+        <div className="event-grid">
+          {filtered.map((event) => {
+            const state = states[event.id];
+            return (
+              <article className="event-card" key={event.id}>
+                <div className="row spread">
+                  <span className="event-icon">
+                    <CalendarIcon />
+                  </span>
+                  <span
+                    className={`chip ${state?.phase === "running" ? "chip-ok" : "chip-info"}`}
+                  >
+                    {state?.phase ??
+                      (checking
+                        ? "Checking"
+                        : event.role === "anchor"
+                          ? "Anchor"
+                          : "Unavailable")}
+                  </span>
+                </div>
+                <h2>{state?.name ?? event.name}</h2>
+                <p className="small muted">
+                  {state
+                    ? new Date(state.startsAt).toLocaleString("en-IN", {
+                        timeZone: "Asia/Kolkata",
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      }) + " IST"
+                    : "Saved event shortcut"}
+                </p>
+                {state && (
+                  <div className="event-facts">
+                    <span>{state.cues.length} cues</span>
+                    <span>{state.hardEndMin} min</span>
+                    <span>
+                      {state.mode === "rehearsal" ? "Rehearsal" : "Live mode"}
+                    </span>
+                  </div>
+                )}
+                {errors[event.id] && (
+                  <p className="small error" role="status">
+                    {errors[event.id]}
+                  </p>
+                )}
+                <div className="event-card-footer">
+                  <span className="small muted">
+                    {event.role === "owner" ? "Organizer" : "Anchor"}
+                  </span>
+                  <a
+                    className="text-link"
+                    href={
+                      event.role === "owner"
+                        ? `#/event/${event.id}/${state?.phase === "draft" && !state.cues.length ? "setup" : "console"}`
+                        : `#/anchor/${event.id}`
+                    }
+                  >
+                    Open event <ArrowRightIcon />
+                  </a>
+                </div>
+                {errors[event.id] && (
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      forgetEvent(event.id);
+                      setEvents(recentEvents());
+                    }}
+                  >
+                    Remove shortcut
+                  </button>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+      <section className="workspace-footer">
+        <div>
+          <strong>Already have an event ID?</strong>
+          <p className="small muted">
+            Open an event this identity owns or has joined.
+          </p>
+        </div>
+        <form onSubmit={(event) => void open(event)} className="row">
+          <input
+            aria-label="Event ID"
+            placeholder="Paste event ID"
+            value={openId}
+            onChange={(e) => setOpenId(e.target.value)}
+            required
+          />
+          <button disabled={opening}>
+            {opening ? "Opening…" : "Open event"}
+            <ArrowRightIcon />
+          </button>
+        </form>
+      </section>
+      {!createOpen && !joinOpen && formError && (
+        <p className="notice notice-bad" role="alert">
+          {formError}
+        </p>
+      )}
+      <p className="footnote">
+        Browser-local workspace · Anonymous identity · Events expire after 72
+        hours
+      </p>
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Create your event"
+        description="Start with a blank agenda. You can load the fictional scenario in rehearsal setup."
+        busy={busy}
+      >
+        <form onSubmit={(event) => void create(event)}>
+          <fieldset disabled={busy}>
+            <div className="field">
+              <label htmlFor="event-name">Event name</label>
+              <input
+                id="event-name"
+                autoFocus
+                required
+                maxLength={120}
+                placeholder="e.g. Campus innovation summit"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="event-start">Start date & time (IST)</label>
+                <input
+                  id="event-start"
+                  type="datetime-local"
+                  required
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="duration">
+                  Hard finish, minutes after start
+                </label>
+                <input
+                  id="duration"
+                  type="number"
+                  min="1"
+                  max="240"
+                  required
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor="mode">Event mode</label>
+              <select
+                id="mode"
+                value={mode}
+                onChange={(e) =>
+                  setMode(e.target.value as "rehearsal" | "live")
+                }
+              >
+                <option value="rehearsal">
+                  Rehearsal · manual scenario clock
+                </option>
+                <option value="live">Live · actual server clock</option>
+              </select>
+            </div>
+            <p className="notice small">
+              Mode cannot change after creation. Demo data expires after 72
+              hours. Maximum two creations per identity per day; shared capacity
+              also applies.
+            </p>
+            <p className="small muted">
+              Keep this browser session. Signing out or clearing browser storage
+              loses access to your events.
+            </p>
+            {formError && (
+              <p className="error" role="alert">
+                {formError}
+              </p>
+            )}
+            <div className="row end">
+              <button type="button" onClick={() => setCreateOpen(false)}>
+                Cancel
+              </button>
+              <Button type="submit" size="3">
+                {command.status === "pending" ? "Creating…" : "Create event"}
+                <ArrowRightIcon />
+              </Button>
+            </div>
+          </fieldset>
+          <CommandNotice
+            {...command}
+            retry={() =>
+              void command.retry<{ state: EventState }>().then(finishCreation)
+            }
+          />
+        </form>
+      </Modal>
+      <Modal
+        open={joinOpen}
+        onClose={() => setJoinOpen(false)}
+        title="Join as an anchor"
+        description="Use the private invitation link your organizer shared with you."
+      >
+        <form onSubmit={join}>
+          <div className="field">
+            <label htmlFor="invite-url">Invitation link</label>
+            <input
+              id="invite-url"
+              required
+              value={joinUrl}
+              onChange={(e) => setJoinUrl(e.target.value)}
+              placeholder="https://…/#/join/…?code=…"
+            />
+          </div>
+          {formError && (
+            <p className="error" role="alert">
+              {formError}
+            </p>
+          )}
+          <p className="small muted">
+            Invitations are single-use and expire after one hour.
+          </p>
+          <Button type="submit">
+            Open invitation
+            <ArrowRightIcon />
+          </Button>
+        </form>
+      </Modal>
     </div>
   );
 }

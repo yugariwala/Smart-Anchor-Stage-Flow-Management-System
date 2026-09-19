@@ -49,6 +49,15 @@ hand-write a version string into a `package.json`.
 7. **Anything unimplemented throws** `new Error("not implemented: Milestone N")` — never a fake
    return value that looks like it works.
 
+## Pinned dependencies — do not "fix" these
+
+**`@cloudflare/vitest-pool-workers` is pinned to `^0.22.0`. Do not run `npm audit fix --force`.**
+It reports a `sharp`/libheif advisory reached only through `miniflare`, which is the local
+emulator and is never deployed; the Worker decodes no images. The "fix" downgrades the pool to
+0.8.30, which peer-requires vitest 2–3.1 against our vitest 4, removes the `cloudflareTest`
+export the API config uses, and takes the entire test suite offline — typecheck fails and zero
+tests run. This has already happened once. The advisory is a recorded, deliberate accept.
+
 ## Frontend rules
 
 1. **The frontend never computes a schedule.** It renders what the server published. Only
