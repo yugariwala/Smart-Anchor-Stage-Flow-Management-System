@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cuepilot-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-19",
+
+  // Public, non-secret configuration. GEMINI_API_KEY is a Worker SECRET and is set with
+  //   npx wrangler secret put GEMINI_API_KEY
+  // It must never appear here or anywhere else in the working tree.
+  "vars": {
+    "FIREBASE_PROJECT_ID": "smart-anchor-stage-flow-system",
+    "ALLOWED_ORIGINS": "http://localhost:5173",
+    "GEMINI_MODEL": "gemini-2.5-flash-lite",
+    "AI_ENABLED": "false",
+    "APP_ENV": "dev",
+    "BUILD_COMMIT": "dev"
+  },
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "EVENT_ROOMS", "class_name": "EventRoom" },
+      { "name": "QUOTA_ROOMS", "class_name": "QuotaRoom" }
+    ]
+  },
+
+  // Both classes are registered as NEW SQLITE classes.
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["EventRoom", "QuotaRoom"]
+    }
+  ],
+
+  "observability": { "enabled": true }
+}

@@ -1,0 +1,11 @@
+# Local Worker configuration. Copy to .dev.vars and fill in your own values.
+# .dev.vars is gitignored; this example file is committed.
+#
+# GEMINI_API_KEY is deliberately absent: it is a Worker SECRET, set with
+#   npx wrangler secret put GEMINI_API_KEY
+# and must never appear in a file in the working tree.
+FIREBASE_PROJECT_ID=your-firebase-project-id
+ALLOWED_ORIGINS=http://localhost:5173
+GEMINI_MODEL=gemini-2.5-flash-lite
+AI_ENABLED=false
+APP_ENV=dev

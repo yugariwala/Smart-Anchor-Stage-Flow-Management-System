@@ -10,3 +10,6 @@ dist/
 coverage/
 *.local
 .DS_Store
+
+# Credentials handed over for local setup — never committed
+firebase-config.txt
