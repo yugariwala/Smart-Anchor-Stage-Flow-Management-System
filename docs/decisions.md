@@ -46,3 +46,36 @@ settled. "Ours" means the contract is this team's invention, not the spec's.
 - **`apps/api/.dev.vars` overrides miniflare test bindings.** The test harness therefore reads `env.FIREBASE_PROJECT_ID` and mints tokens for whatever value is actually bound, rather than assuming `test-project`.
 - **Tests reset the shared `QuotaRoom` counters in `beforeAll`.** The §12 caps (100 events/project/day, 2/uid/day) are real production limits, not test knobs, so they are unchanged - but one QuotaRoom is shared across suites and the project cap would eventually make an unrelated test fail with `429` as the suite grows. Resetting keeps a `429` in a test meaningful.
 - **`lib` includes `DOM` and the domain package has no `@types/node`.** The fixture is loaded through `resolveJsonModule` so Node APIs cannot leak into a package that must also run on Workers and in the browser.
+
+## 2026-09-19 - credential handling
+
+These exist because a Gemini API key was leaked into a session transcript. The key was
+revoked and rotated. Both rules are absolute, not best-effort.
+
+1. **Treat every value in a credential file as secret by default.** Do not pattern-match
+   known key formats. The leak happened because a redaction pass matched `AIza...` (Firebase
+   web keys) and `key: <long-string>`, and the Gemini key was neither - it was `AQ.<short>`,
+   which fell under the minimum-length guard. Redaction by recognised format fails on the
+   first unfamiliar format, which is exactly the one worth protecting. Redact structurally:
+   print field NAMES and never field VALUES.
+2. **Do not read a credential file into context again.** Not for the Gemini key, not for the
+   Firebase web config, not to "check" a value. `GEMINI_API_KEY` reaches the Worker only via
+   `npx wrangler secret put GEMINI_API_KEY`, run by the user. If a value is needed for a
+   config file, ask the user to paste it or to write the file themselves.
+3. **`firebase-config.txt` is gitignored** (`.gitignore:15`) and was never committed.
+   Verified with `git check-ignore`.
+4. **Publicness is not the test.** A Firebase web `apiKey` is public client configuration and
+   needs no rotation, but it is still not echoed. The rule is about the class of file, not a
+   per-value judgement about how sensitive it is.
+
+## 2026-09-19 - Milestone 2 deviations, itemised
+
+Recorded individually because each one is a version or environment constraint a future
+session will otherwise rediscover the hard way.
+
+| Deviation | Reason |
+|---|---|
+| **vitest 5.0.1 -> 4.1.11** | `@cloudflare/vitest-pool-workers@0.22.0` (the latest) peer-requires `vitest ^4.1.0`. It also replaced `defineWorkersConfig` from the `/config` subpath with a `cloudflareTest()` Vite plugin exported from the package root. The domain tests use only `describe`/`it`/`expect` and were unaffected. Revisit when the pool supports vitest 5. |
+| **`compatibility_date` = `2026-08-22`, not today** | The installed workerd binary refuses to start against a later date: *"This Worker requires compatibility date 2026-09-19, but the newest date supported by this server binary is 2026-08-22."* Pinned to the binary's ceiling. Bump when wrangler ships a newer runtime. |
+| **zod 4 only, one instance** | npm installed a second nested copy (4.4.3 in `apps/api` alongside the domain's 4.6.5). Zod 4 brands its internals with `_zod.version`, so two minors produce schemas whose types are not mutually assignable across a package boundary - it surfaced as *"The types of `_zod.version.minor` are incompatible... Type '6' is not assignable to type '4'"*. Rather than pin two copies to the same version and rely on hoisting, `apps/api` declares no `zod` dependency at all and imports `z` re-exported from `@cuepilot/domain`. One instance by construction, which is a stronger guarantee than a matching version range. |
+| **`npm audit`: 4 high left unfixed** | All one transitive chain: `@cloudflare/vitest-pool-workers` -> `miniflare` -> `sharp` (< 0.35.4) -> libheif image decoding. `miniflare` is the local emulator and is never deployed; the Worker never decodes an image. `npm audit fix --force` would downgrade the pool from 0.22 to 0.8.30, a breaking change that also loses the vitest 4 support we need. Revisit when miniflare bumps `sharp`. |
