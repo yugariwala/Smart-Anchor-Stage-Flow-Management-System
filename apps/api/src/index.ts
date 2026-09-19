@@ -406,13 +406,19 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
     if (tail.length === 1) {
       const beforeRaw = url.searchParams.get('before');
       const limitRaw = url.searchParams.get('limit');
+      const before = beforeRaw === null ? null : Number(beforeRaw);
+      const limit = limitRaw === null ? 20 : Number(limitRaw);
+      // `Number('abc')` is NaN; passing that to SQLite is a 500, not a page. Validate here
+      // so a malformed query is a documented 422 and the storage layer never sees it.
+      if (
+        (before !== null && (!Number.isInteger(before) || before < 1)) ||
+        !Number.isInteger(limit) ||
+        limit < 1
+      ) {
+        return fail(ctx, apiError('VALIDATION_FAILED', 'before and limit must be positive integers.'));
+      }
       const out = await viaRoom(
-        stub.listRevisions(
-          uid,
-          beforeRaw === null ? null : Number(beforeRaw),
-          limitRaw === null ? 20 : Number(limitRaw),
-          serverNow,
-        ),
+        stub.listRevisions(uid, before, limit, serverNow),
       );
       return respond(ctx, out.status, out.body);
     }

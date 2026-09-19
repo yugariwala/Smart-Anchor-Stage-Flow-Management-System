@@ -24,6 +24,11 @@ import {
   type RevisionMutation,
 } from "../lib/api";
 import { FIXTURE_CUES, FIXTURE_SPEAKERS } from "../lib/fixture";
+import {
+  agendaCsvTemplate,
+  importAgendaCsv,
+  type AgendaImport,
+} from "../lib/csvAgenda";
 import { navigate } from "../lib/route";
 import { useCommand } from "../lib/useCommand";
 import { RehearsalBanner } from "../components/RehearsalBanner";
@@ -58,6 +63,9 @@ export function SetupScreen({ eventId }: { eventId: string }) {
   const [issues, setIssues] = useState<string[]>([]);
   const [loadError, setLoadError] = useState("");
   const [fixtureOpen, setFixtureOpen] = useState(false);
+  const [csvOpen, setCsvOpen] = useState(false);
+  const [csvResult, setCsvResult] = useState<AgendaImport | null>(null);
+  const [csvFileName, setCsvFileName] = useState("");
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [leaveTarget, setLeaveTarget] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -181,6 +189,38 @@ export function SetupScreen({ eventId }: { eventId: string }) {
     cues.splice(index, 1);
     cues.splice(target, 0, cue);
     patch({ cues: cues.map((c, i) => ({ ...c, order: i })) });
+  };
+  const downloadAgendaTemplate = (): void => {
+    const url = URL.createObjectURL(
+      new Blob([agendaCsvTemplate()], { type: "text/csv;charset=utf-8" }),
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "cuepilot-agenda-template.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+  const readAgendaCsv = async (file: File): Promise<void> => {
+    setCsvFileName(file.name);
+    try {
+      setCsvResult(importAgendaCsv(await file.text(), draft.speakers, draft.cues.length));
+    } catch {
+      setCsvResult({
+        ok: false,
+        errors: ["That file could not be read as text."],
+      });
+    }
+  };
+  const applyAgendaImport = (): void => {
+    if (csvResult === null || !csvResult.ok) return;
+    patch({
+      cues: [...draft.cues, ...csvResult.cues],
+      speakers: [...draft.speakers, ...csvResult.newSpeakers],
+    });
+    setCsvResult(null);
+    setCsvFileName("");
+    setCsvOpen(false);
+    setTab("agenda");
   };
   const finish = (result: RevisionMutation | null) => {
     if (result) {
@@ -437,32 +477,45 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                     server calculates the schedule when you save.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  disabled={draft.cues.length >= 20}
-                  onClick={() =>
-                    patch({
-                      cues: [
-                        ...draft.cues,
-                        {
-                          id: crypto.randomUUID(),
-                          order: draft.cues.length,
-                          title: "",
-                          speakerId: null,
-                          preferredDurationMin: 10,
-                          minDurationMin: 5,
-                          compressionPenalty: 1,
-                          bufferBeforeMin: 0,
-                          notBeforeMin: null,
-                          fixedStartMin: null,
-                        },
-                      ],
-                    })
-                  }
-                >
-                  <PlusIcon />
-                  Add cue
-                </button>
+                <div className="row">
+                  <button
+                    type="button"
+                    disabled={draft.cues.length >= 20}
+                    onClick={() => {
+                      setCsvResult(null);
+                      setCsvFileName("");
+                      setCsvOpen(true);
+                    }}
+                  >
+                    Import CSV
+                  </button>
+                  <button
+                    type="button"
+                    disabled={draft.cues.length >= 20}
+                    onClick={() =>
+                      patch({
+                        cues: [
+                          ...draft.cues,
+                          {
+                            id: crypto.randomUUID(),
+                            order: draft.cues.length,
+                            title: "",
+                            speakerId: null,
+                            preferredDurationMin: 10,
+                            minDurationMin: 5,
+                            compressionPenalty: 1,
+                            bufferBeforeMin: 0,
+                            notBeforeMin: null,
+                            fixedStartMin: null,
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    <PlusIcon />
+                    Add cue
+                  </button>
+                </div>
               </section>
               {!draft.cues.length && (
                 <EmptyState
@@ -788,6 +841,108 @@ export function SetupScreen({ eventId }: { eventId: string }) {
             }}
           >
             Load scenario
+          </Button>
+        </div>
+      </Modal>
+      <Modal
+        open={csvOpen}
+        onClose={() => setCsvOpen(false)}
+        title="Import an agenda from CSV"
+        description="Use the provided template, replace its example rows, then import. Imported cues are added to the current agenda and are not saved or published until you save the draft."
+      >
+        <div className="row">
+          <button type="button" onClick={downloadAgendaTemplate}>
+            Download template
+          </button>
+          <span className="small muted">
+            Columns: title, speaker, preferred_duration_min, min_duration_min,
+            compression_penalty, buffer_before_min, available_from_min,
+            fixed_start_min.
+          </span>
+        </div>
+        <div className="field">
+          <label htmlFor="agenda-csv">CSV file</label>
+          <input
+            id="agenda-csv"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) void readAgendaCsv(file);
+            }}
+          />
+        </div>
+        {csvFileName && (
+          <p className="small muted">Selected: {csvFileName}</p>
+        )}
+        {csvResult !== null && !csvResult.ok && (
+          <div className="notice notice-bad" role="alert">
+            <strong>Fix these rows before importing</strong>
+            <ul>
+              {csvResult.errors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {csvResult !== null && csvResult.ok && (
+          <>
+            <div
+              className="table-scroll"
+              role="region"
+              aria-label="Import preview"
+              tabIndex={0}
+            >
+              <table>
+                <caption className="sr-only">
+                  Cues that will be added to the agenda
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Cue</th>
+                    <th scope="col">Speaker</th>
+                    <th scope="col" className="num">
+                      Pref / min
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {csvResult.cues.map((cue) => (
+                    <tr key={cue.id}>
+                      <th scope="row">{cue.title}</th>
+                      <td>
+                        {[...draft.speakers, ...csvResult.newSpeakers].find(
+                          (speaker) => speaker.id === cue.speakerId,
+                        )?.displayName ?? "No speaker"}
+                      </td>
+                      <td className="num">
+                        {cue.preferredDurationMin}/{cue.minDurationMin}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {csvResult.warnings.map((warning) => (
+              <p className="notice notice-warn small" role="status" key={warning}>
+                {warning}
+              </p>
+            ))}
+          </>
+        )}
+        <div className="row end">
+          <button type="button" onClick={() => setCsvOpen(false)}>
+            Cancel
+          </button>
+          <Button
+            type="button"
+            disabled={csvResult === null || !csvResult.ok}
+            onClick={applyAgendaImport}
+          >
+            {csvResult !== null && csvResult.ok
+              ? `Add ${csvResult.cues.length} cue${csvResult.cues.length === 1 ? "" : "s"}`
+              : "Add cues"}
           </Button>
         </div>
       </Modal>

@@ -177,6 +177,8 @@ export const eventStateSchema = z
     currentCueId: idSchema.nullable(),
     activeForecastEndMin: z.int().min(0).max(HORIZON_MAX).nullable(),
     scheduleHealth: z.enum(['valid', 'needs_repair']),
+    // Defaulted so records created before the extension stay valid readers.
+    demoSeed: z.literal('college-demo-v1').nullable().default(null),
     eventFacts: z.array(factSchema).max(10),
     speakers: z.array(speakerSchema).max(20), // at most 20 speakers
     cues: cuesSchema,

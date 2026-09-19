@@ -278,6 +278,42 @@ describe('invitations', () => {
     expect(Date.parse(body.expiresAt)).toBeGreaterThan(Date.now());
   });
 
+  it('refuses a replayed invitation request instead of inventing a second secret', async () => {
+    const owner = await mintToken('owner-14b');
+    const eventId = await createEvent(owner);
+    const key = uuid();
+    const first = await call('POST', `/v1/events/${eventId}/invitations`, {
+      token: owner,
+      body: { role: 'anchor' },
+      idempotencyKey: key,
+    });
+    const firstBody = await json<{ inviteCode: string }>(first);
+    expect(first.status).toBe(201);
+
+    // The ledger cannot replay the plaintext: only its hash was stored. Returning a new
+    // secret here would hand out a code the database has never seen.
+    const retry = await call('POST', `/v1/events/${eventId}/invitations`, {
+      token: owner,
+      body: { role: 'anchor' },
+      idempotencyKey: key,
+    });
+    const retryText = await retry.text();
+    expect(retry.status).toBe(409);
+    expect((JSON.parse(retryText) as { error: { code: string } }).error.code).toBe(
+      'INVITATION_INVALID',
+    );
+    expect(retryText).not.toContain(firstBody.inviteCode);
+
+    // A genuinely new request still works.
+    const fresh = await call('POST', `/v1/events/${eventId}/invitations`, {
+      token: owner,
+      body: { role: 'anchor' },
+      idempotencyKey: uuid(),
+    });
+    expect(fresh.status).toBe(201);
+    expect((await json<{ inviteCode: string }>(fresh)).inviteCode).not.toBe(firstBody.inviteCode);
+  });
+
   it('consumes an invitation exactly once', async () => {
     const owner = await mintToken('owner-15');
     const eventId = await createEvent(owner);
@@ -420,19 +456,6 @@ describe('request hygiene', () => {
     }).then(async (r) => r);
     // A body-less mutation parses as {} and fails validation, not JSON parsing.
     expect([400, 422]).toContain(res.status);
-  });
-
-  it('defers the seeded demo scenario to a later milestone rather than faking it', async () => {
-    const owner = await mintToken('owner-25');
-    const res = await call('PUT', `/v1/events/${freshEventId()}`, {
-      token: owner,
-      body: createBody({ seed: 'college-demo-v1' }),
-      idempotencyKey: uuid(),
-    });
-    expect(res.status).toBe(422);
-    const body = await json<{ error: { code: string; message: string } }>(res);
-    expect(body.error.code).toBe('NOT_IMPLEMENTED');
-    expect(body.error.message).toBe('not implemented: Milestone 5');
   });
 
   it('attaches a request id to every response', async () => {

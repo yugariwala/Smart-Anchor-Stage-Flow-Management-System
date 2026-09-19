@@ -6,6 +6,7 @@ import {
   CalendarIcon,
   ArrowTopRightIcon,
   Link2Icon,
+  MagicWandIcon,
 } from "@radix-ui/react-icons";
 import { Button } from "@radix-ui/themes";
 import type { EventState } from "@cuepilot/domain";
@@ -24,6 +25,7 @@ import {
   forgetEvent,
   type RecentEvent,
 } from "../lib/storage";
+import { FIXTURE_EVENT_NAME } from "../lib/fixture";
 import { useCommand } from "../lib/useCommand";
 import { eventTimingLabel } from "../lib/displayTime";
 import {
@@ -51,6 +53,8 @@ export function Landing({ uid }: { uid: string }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoAttempted, setDemoAttempted] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [name, setName] = useState("");
   const [start, setStart] = useState(startDefault);
@@ -103,8 +107,31 @@ export function Landing({ uid }: { uid: string }) {
   const finishCreation = (result: { state: EventState } | null) => {
     if (result) {
       rememberEvent(result.state, "owner");
-      navigate(`#/event/${result.state.id}/setup`);
+      // A seeded event already has an agenda; its next labeled step is on the console.
+      const seeded = result.state.demoSeed === "college-demo-v1";
+      navigate(
+        `#/event/${result.state.id}/${seeded ? "console" : "setup"}`,
+      );
     }
+  };
+  const createDemo = async (): Promise<void> => {
+    setFormError("");
+    setDemoAttempted(true);
+    createdId.current = crypto.randomUUID();
+    const body: CreateBody = {
+      name: FIXTURE_EVENT_NAME,
+      startsAt: new Date(startDefault() + ":00+05:30")
+        .toISOString()
+        .replace(".000Z", "Z"),
+      hardEndMin: 60,
+      mode: "rehearsal",
+      seed: "college-demo-v1",
+    };
+    const result = await command.run("create-demo", (key) =>
+      createEvent(createdId.current, body, key),
+    );
+    if (result) setDemoOpen(false);
+    finishCreation(result);
   };
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -215,6 +242,15 @@ export function Landing({ uid }: { uid: string }) {
               }}
             >
               <Link2Icon /> Join an event
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => {
+                setDemoOpen(true);
+                setFormError("");
+              }}
+            >
+              <MagicWandIcon /> Try fictional rehearsal
             </button>
             <Button
               size="3"
@@ -467,6 +503,46 @@ export function Landing({ uid }: { uid: string }) {
         Browser-local workspace · Anonymous identity · Events expire after 72
         hours
       </p>
+      <Modal
+        open={demoOpen}
+        onClose={() => setDemoOpen(false)}
+        title="Try the fictional rehearsal?"
+        description="Creates a personal, labeled rehearsal event seeded with the committed six-cue scenario."
+        busy={busy}
+      >
+        <p className="small muted">
+          Opening → keynote → Q&amp;A → community interaction → sponsor fixed at
+          10:45 → closing at 11:00. Every speaker, fact and event detail is
+          fictional, and the scenario clock is controlled by you.
+        </p>
+        <p className="notice small">
+          REHEARSAL · fictional event and speakers · scenario clock.
+        </p>
+        {formError && (
+          <p className="error" role="alert">
+            {formError}
+          </p>
+        )}
+        <div className="row end">
+          <button disabled={busy} onClick={() => setDemoOpen(false)}>
+            Cancel
+          </button>
+          <Button disabled={busy} onClick={() => void createDemo()}>
+            {command.status === "pending" ? "Creating…" : "Create rehearsal"}
+          </Button>
+        </div>
+        {demoAttempted && (
+          <CommandNotice
+            {...command}
+            retry={() =>
+              void command.retry<{ state: EventState }>().then((result) => {
+                if (result) setDemoOpen(false);
+                finishCreation(result);
+              })
+            }
+          />
+        )}
+      </Modal>
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}

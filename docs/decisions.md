@@ -329,10 +329,82 @@ the same command. Six subsequent full runs were clean. It is recorded here rathe
 because an intermittent failure that nobody wrote down is one that gets rediscovered at H20.
 If it recurs, the shared `QuotaRoom` across parallel API test files is the first place to look.
 
+## 2026-09-19 - CSV agenda import (§8 SHOULD-HAVE)
+
+§8 lists "CSV import with a provided template" first among the SHOULD-HAVEs, and every MUST
+acceptance condition is green, so it is built. The feature is deliberately frontend-only:
+it edits the draft, and the server remains the schedule authority.
+
+- **Template**: generated from `FIXTURE_CUES` / `FIXTURE_SPEAKERS` in
+  `apps/web/src/lib/csvAgenda.ts`, so the template, the setup "Load scenario" data and the
+  demo share one source. It is downloadable from the import modal.
+- **Columns**: `title, speaker, preferred_duration_min, min_duration_min,
+  compression_penalty, buffer_before_min, available_from_min, fixed_start_min`. Header
+  matching is trimmed and case-insensitive; unknown columns warn; missing required columns
+  and duplicate columns are refused.
+- **Behaviour**: rows are APPENDED to the current agenda. A same-name speaker is matched
+  case-insensitively; an unknown name creates a speaker with NO facts, because inventing
+  facts would violate the approved-facts rule - the warning says to add them before scripts.
+  The 20-cue §12 limit is enforced before the file is applied.
+- **Authority**: the importer only builds `draftCueInputSchema`-valid cue INPUT and hands it
+  to the existing `PUT /draft`; intervals stay server-computed and nothing is scheduled or
+  published. One bad row fails the whole import with its row number and reason, so a partial
+  agenda is never silently applied.
+
+## 2026-09-19 - audit fixes and the seeded rehearsal
+
+An audit pass fixed four defects and implemented the one endpoint the code still refused.
+
+1. **`purge` now deletes `command_results`.** The old comment in `destroy` already claimed the
+   tombstone wiped the ledger; it did not. `command_results.response_json` stores full event
+   state, so personal content outlived the 72-hour promise - and because `replayOrReject`
+   runs before any deletion check, a replayed key returned a stale `201`/`200` after deletion
+   or expiry. The deletion and expiry tests now assert a zero ledger row count.
+2. **Revision pagination is validated in the Worker.** `Number('abc')` is `NaN`; binding it
+   to SQLite raised `SQLITE_MISMATCH` and answered `500 INTERNAL`. Non-integer or
+   non-positive `before`/`limit` now return `422 VALIDATION_FAILED`; the DO clamp remains as
+   the second line.
+3. **A replayed invitation request is refused, not re-minted.** The invite plaintext is
+   deliberately never stored, so the ledger cannot replay it; the Worker previously generated
+   a fresh secret on replay and returned a link whose hash had never been inserted. A same-key
+   retry now returns `409 INVITATION_INVALID` with "its code cannot be shown again", which is
+   what "returned exactly once" actually means.
+4. **Gujarati template fallback copy was corrupted** (`સ્વાદેવું`, `સે કોી`). Replaced with
+   standard Gujarati. The `generated; language quality unverified` label still applies per
+   §18 - see `tests/api/gemini-adapter.test.ts`.
+
+### `seed: "college-demo-v1"` is implemented
+
+This supersedes the M2 ruling that deferred it. The seed builds a **draft** from the committed
+`fixtures/college-demo-v1.json`: speakers and cue inputs run through `computeInitialIntervals` +
+`materializeDraftCues`, so runtime fields are never taken from the fixture. The request config
+supplies name/startsAt/hardEndMin; because the scenario occupies minutes 0-60 on the scenario
+clock, `mode: "rehearsal"` and `hardEndMin >= 60` are **required** - a live or too-short
+configuration is refused with `422`, never silently relaxed. The resulting state passes the same
+`eventStateSchema` and 128 KB checks as every other write.
+
+The provenance of a seeded event lives in a new server-owned `EventState.demoSeed` field
+(`"college-demo-v1" | null`, defaulted to null by `eventStateSchema` so pre-extension records
+still parse). It is deliberately NOT an organizer fact: `PUT /draft` cannot set it, and because
+`saveDraft` spreads the existing state it survives later agenda edits. This is what the labeled
+action keys off, so an organizer cannot fake a seeded scenario and a real one cannot be erased
+by editing the agenda.
+
+Driving that draft with the six ordinary commands - publish, start opening, clock to minute 5,
+complete opening, start keynote, clock to minute 25 - reproduces the committed fixture exactly
+at revision 7. `tests/api/demo-seed.test.ts` asserts the full cue list, statuses and actual
+times equal the fixture, so the seed and the fixture cannot drift.
+
+The web side is deliberately orchestration, not a bypass: `apps/web/src/lib/loadRehearsal.ts`
+plans the normal commands, and the console offers a labeled **"Load rehearsal at keynote"**
+implemented by those same commands, gated on `demoSeed`. Landing offers one-click **"Try
+fictional rehearsal"** creation. Both labels follow §11/§12; the planner also resumes correctly
+if a reply was lost mid-sequence.
+
 ## 2026-09-19 - the master report's model references are superseded
 
-The report is the authoritative spec and is not edited. These two places name a model that is
-no longer callable, and anything derived from them must be corrected before it is presented:
+The report is the authoritative spec and is not edited. These two places name a model that
+is no longer callable, and anything derived from them must be corrected before it is presented:
 
 - **§7B** ("Use Gemini 2.5 Flash-Lite ... through a server-side adapter") and the **§10 stack
   table** ("AI | Gemini 2.5 Flash-Lite through an adapter"). Superseded: the deployed adapter

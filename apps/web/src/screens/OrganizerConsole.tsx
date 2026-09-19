@@ -35,7 +35,9 @@ import {
   startCueCommand,
   type EventEnvelope,
   type ProposalResponse,
+  type RevisionMutation,
 } from "../lib/api";
+import { planLoadRehearsal, rehearsalClockIso } from "../lib/loadRehearsal";
 import { localTime, localTimeOf, signedMinutes } from "../lib/format";
 import { inviteLink, navigate } from "../lib/route";
 import { useCommand } from "../lib/useCommand";
@@ -71,6 +73,7 @@ export function OrganizerConsole({
   const [releaseCue, setReleaseCue] = useState("");
   const [releaseMinute, setReleaseMinute] = useState("");
   const [publishOpen, setPublishOpen] = useState(false);
+  const [keynoteOpen, setKeynoteOpen] = useState(false);
   const lastEnvelopeRevision = useRef<number | null>(null);
 
   const reload = useCallback(async (): Promise<void> => {
@@ -156,6 +159,11 @@ export function OrganizerConsole({
     loadError !== "" ||
     (state.phase !== "draft" && poll.freshness === "stale");
 
+  // The labeled demo action is offered only on the server-seeded rehearsal, and only while
+  // the scenario is not already loaded at the keynote.
+  const rehearsalSteps =
+    state.demoSeed === "college-demo-v1" ? planLoadRehearsal(state) : [];
+
   const run = async (
     intent: string,
     fn: (key: string) => Promise<unknown>,
@@ -176,6 +184,46 @@ export function OrganizerConsole({
       await reload();
       poll.refresh();
     }
+  };
+
+  /**
+   * The §12 demo action. It replays the ordinary command sequence — no endpoint and no
+   * permission is bypassed — and stops at the first failure rather than guessing.
+   */
+  const onLoadRehearsal = async (): Promise<void> => {
+    const steps = planLoadRehearsal(state);
+    if (steps.length === 0) return;
+    let rev = revision;
+    for (const step of steps) {
+      let result: RevisionMutation | null;
+      if (step.kind === "publish") {
+        result = await command.run(`demo:publish:${rev}`, (key) =>
+          publishEvent(eventId, rev, key),
+        );
+      } else if (step.kind === "start") {
+        result = await command.run(`demo:start:${step.cueId}:${rev}`, (key) =>
+          startCueCommand(eventId, step.cueId, rev, key),
+        );
+      } else if (step.kind === "complete") {
+        result = await command.run(`demo:complete:${step.cueId}:${rev}`, (key) =>
+          completeCueCommand(eventId, step.cueId, rev, key),
+        );
+      } else {
+        result = await command.run(`demo:clock:${step.targetMin}:${rev}`, (key) =>
+          setRehearsalClock(
+            eventId,
+            rev,
+            rehearsalClockIso(state.startsAt, step.targetMin),
+            key,
+          ),
+        );
+      }
+      if (result === null) return;
+      rev = result.revision;
+    }
+    setKeynoteOpen(false);
+    await reload();
+    poll.refresh();
   };
 
   const onStart = (cueId: string): Promise<void> =>
@@ -509,6 +557,25 @@ export function OrganizerConsole({
           </div>
 
           <div>
+            {rehearsalSteps.length > 0 ? (
+              <div className="card">
+                <h2>Seeded rehearsal</h2>
+                <p className="small muted">
+                  This is the labeled fictional TechFest scenario. The action
+                  below publishes it and advances the opening so the keynote is
+                  active, using the normal stage commands — the same buttons a
+                  person would click.
+                </p>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => setKeynoteOpen(true)}
+                  disabled={readOnly}
+                >
+                  Load rehearsal at keynote
+                </button>
+              </div>
+            ) : null}
             {state.phase === "draft" ? (
               <div className="card">
                 <h2>Publish the runbook</h2>
@@ -794,6 +861,41 @@ export function OrganizerConsole({
           </div>
         </div>
 
+        <Modal
+          open={keynoteOpen}
+          onClose={() => setKeynoteOpen(false)}
+          title="Load rehearsal at keynote?"
+          description="Publishes the seeded draft and advances the opening so the keynote is active, using the normal stage commands only."
+          busy={busy}
+        >
+          <p className="small muted">
+            The commands run in order — publish, start and complete the opening,
+            advance the scenario clock to each published cue boundary, then start
+            the keynote. No rule is bypassed and every step is an ordinary
+            idempotent command.
+          </p>
+          <div className="row end">
+            <button disabled={busy} onClick={() => setKeynoteOpen(false)}>
+              Cancel
+            </button>
+            <Button disabled={busy} onClick={() => void onLoadRehearsal()}>
+              {command.status === "pending"
+                ? "Loading…"
+                : "Load rehearsal at keynote"}
+            </Button>
+          </div>
+          <CommandNotice
+            {...command}
+            retry={() =>
+              void command.retry<RevisionMutation>().then(async (result) => {
+                if (result) {
+                  await reload();
+                  poll.refresh();
+                }
+              })
+            }
+          />
+        </Modal>
         <Modal
           open={publishOpen}
           onClose={() => setPublishOpen(false)}

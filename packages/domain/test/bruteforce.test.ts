@@ -167,6 +167,7 @@ const buildCase = (index: number, rnd: () => number): GeneratedCase => {
     currentCueId: 'active',
     activeForecastEndMin: cursor,
     scheduleHealth: 'valid',
+    demoSeed: null,
     eventFacts: [],
     speakers: [],
     cues,

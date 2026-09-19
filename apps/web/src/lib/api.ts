@@ -192,7 +192,11 @@ export type CreateBody = {
   startsAt: string;
   hardEndMin: number;
   mode: "rehearsal" | "live";
-  seed: "blank";
+  /**
+   * `blank` starts empty; `college-demo-v1` seeds the committed six-cue rehearsal scenario
+   * as a draft. Reaching the running keynote state still happens through normal commands.
+   */
+  seed: "blank" | "college-demo-v1";
 };
 
 export type DraftCueInputBody = {

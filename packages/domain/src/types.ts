@@ -87,6 +87,14 @@ export type EventState = {
   currentCueId: UUID | null;
   activeForecastEndMin: number | null;
   scheduleHealth: 'valid' | 'needs_repair';
+  /**
+   * EXTENSION to §12: which seed produced this event, if any.
+   *
+   * Server-owned metadata, not an organizer fact, so `PUT /draft` can never set it and a
+   * draft edit cannot erase it. It is what the labeled "Load rehearsal at keynote" action
+   * keys off, so an organizer cannot fake a seeded scenario and a real one survives edits.
+   */
+  demoSeed: 'college-demo-v1' | null;
   eventFacts: Fact[];
   speakers: Speaker[];
   cues: Cue[];

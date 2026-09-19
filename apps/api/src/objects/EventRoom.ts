@@ -49,6 +49,11 @@ import {
 
 import { generateScriptDraft, type FetchLike } from '../ai/gemini';
 import { buildEnvelope, PROMPT_VERSION, type ScriptEnvelope } from '../ai/prompt';
+import {
+  COLLEGE_DEMO_HARD_END_MIN,
+  COLLEGE_DEMO_SEED,
+  collegeDemoDraft,
+} from '../demo/collegeDemo';
 import { throwApi } from '../http/errors';
 import SCHEMA_SQL from '../storage/schema.sql';
 
@@ -329,7 +334,17 @@ export class EventRoom extends DurableObject<Env> {
 
   /** Deletes event content, proposals and membership; leaves a non-personal tombstone. */
   private purge(nowIso: string): void {
-    for (const table of ['revisions', 'members', 'invitations', 'proposals', 'acknowledgments']) {
+    for (const table of [
+      'revisions',
+      'members',
+      'invitations',
+      'proposals',
+      'acknowledgments',
+      // The ledger stores full response bodies, which include event content. Leaving it
+      // behind would keep personal state past the 72-hour promise AND let a replayed
+      // key resurrect a deleted event with a 201/200 from `replayOrReject`.
+      'command_results',
+    ]) {
       this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
     }
     this.ctx.storage.sql.exec(
@@ -348,9 +363,23 @@ export class EventRoom extends DurableObject<Env> {
       throwApi('VALIDATION_FAILED', `Invalid event body: ${parsed.error.issues[0]?.message ?? 'unknown'}`);
     }
     const body = parsed.data;
-    if (body.seed === 'college-demo-v1') {
-      throwApi('NOT_IMPLEMENTED', 'not implemented: Milestone 5');
+
+    // `seed: "college-demo-v1"` pre-fills a DRAFT with the committed six-cue scenario. The
+    // fixture is a running state; it is reached later through the normal publish/start/clock/
+    // complete commands, never by writing runtime fields here. A session clock is the point
+    // of the rehearsal, and the fixture occupies minutes 0-60, so both are required rather
+    // than silently relaxed.
+    const seeded = body.seed === COLLEGE_DEMO_SEED;
+    if (seeded && body.mode !== 'rehearsal') {
+      throwApi('VALIDATION_FAILED', 'The fictional rehearsal scenario requires rehearsal mode.');
     }
+    if (seeded && body.hardEndMin < COLLEGE_DEMO_HARD_END_MIN) {
+      throwApi(
+        'VALIDATION_FAILED',
+        `The fictional rehearsal scenario needs a hard finish of at least ${COLLEGE_DEMO_HARD_END_MIN} minutes.`,
+      );
+    }
+    const demo = seeded ? collegeDemoDraft() : null;
 
     return this.ctx.storage.transactionSync(() => {
       const replay = this.replayOrReject(cmd);
@@ -379,15 +408,30 @@ export class EventRoom extends DurableObject<Env> {
         currentCueId: null,
         activeForecastEndMin: null,
         scheduleHealth: 'valid',
+        // Server-owned provenance for the labeled demo action; never settable from a draft.
+        demoSeed: seeded ? COLLEGE_DEMO_SEED : null,
         eventFacts: [],
-        speakers: [],
-        cues: [],
+        speakers: demo?.speakers ?? [],
+        cues: demo?.cues ?? [],
         approvedScripts: [],
         announcements: [],
         createdAt,
         updatedAt: createdAt,
         expiresAt: new Date(Date.parse(createdAt) + RETENTION_MS).toISOString().replace(/\.\d{3}Z$/, 'Z'),
       };
+
+      // The seeded state must satisfy the same contract every other state does. A fixture
+      // that drifts out of the validation limits fails here, not at first publication.
+      const check = eventStateSchema.safeParse(state);
+      if (!check.success) {
+        return throwApi(
+          'VALIDATION_FAILED',
+          `Invalid event state: ${check.error.issues[0]?.message ?? 'unknown'}`,
+        ) as never;
+      }
+      if (!withinStateBodyLimit(state)) {
+        return throwApi('VALIDATION_FAILED', 'Event state exceeds the 128 KB limit.') as never;
+      }
 
       this.ctx.storage.sql.exec(
         'INSERT INTO event_state (singleton, revision, published_revision, state_json, deleted_at) VALUES (1, ?, NULL, ?, NULL)',
@@ -582,7 +626,16 @@ export class EventRoom extends DurableObject<Env> {
   ): Promise<CommandResponse> {
     return this.ctx.storage.transactionSync(() => {
       const replay = this.replayOrReject(cmd);
-      if (replay !== null) return replay;
+      if (replay !== null) {
+        // The stored response deliberately does NOT contain the invite secret: the plaintext
+        // is never persisted, only its SHA-256 hash. The Worker would otherwise mint a NEW
+        // secret on replay and hand out a link whose hash was never stored. "Returned exactly
+        // once" means the honest answer here is a refusal, not a fabricated code.
+        return throwApi(
+          'INVITATION_INVALID',
+          'That invitation was already created and its code cannot be shown again. Create a new invitation.',
+        ) as never;
+      }
       this.requireAccess(cmd.uid, 'owner');
       this.ctx.storage.sql.exec(
         'INSERT INTO invitations (token_hash, role, expires_at, consumed_by, consumed_at) VALUES (?, ?, ?, NULL, NULL)',

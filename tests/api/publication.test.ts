@@ -514,6 +514,20 @@ describe('immutability', () => {
     const body = await json<{ items: unknown[] }>(res);
     expect(body.items.length).toBeLessThanOrEqual(50);
   });
+
+  it('rejects malformed pagination instead of returning a silently empty page', async () => {
+    const owner = await mintToken('pub-owner-17b');
+    const eventId = await createEvent(owner);
+    // `Number('abc')` is NaN; before validation this reached SQLite and produced a 500.
+    for (const query of ['limit=abc', 'before=abc', 'limit=0', 'before=-3']) {
+      const res = await call('GET', `/v1/events/${eventId}/revisions?${query}`, { token: owner });
+      expect(res.status).toBe(422);
+      expect(await errorCode(res)).toBe('VALIDATION_FAILED');
+    }
+    const ok = await call('GET', `/v1/events/${eventId}/revisions?limit=1`, { token: owner });
+    expect(ok.status).toBe(200);
+    expect((await json<{ items: unknown[] }>(ok)).items).toHaveLength(1);
+  });
 });
 
 describe('deletion and expiry', () => {
@@ -533,10 +547,12 @@ describe('deletion and expiry', () => {
     const published = await call('GET', `/v1/events/${eventId}/published`, { token: owner });
     expect(published.status).toBe(404);
 
-    // A non-personal tombstone remains; content and membership are gone.
+    // A non-personal tombstone remains; content, membership AND the idempotency ledger are
+    // gone. A surviving ledger row would replay event content after deletion.
     const rows = await rawRows(eventId);
     expect(rows.state.deleted_at).not.toBeNull();
     expect(rows.revisions).toEqual([]);
+    expect(rows.ledger).toBe(0);
   });
 
   it('rejects a delete with a stale expectedRevision', async () => {
@@ -578,6 +594,7 @@ describe('deletion and expiry', () => {
     const afterFirst = await rawRows(eventId);
     expect(afterFirst.state.deleted_at).not.toBeNull();
     expect(afterFirst.revisions).toEqual([]);
+    expect(afterFirst.ledger).toBe(0);
 
     // Alarms may repeat: a second run must not throw or change anything further.
     await runInDurableObject(stub, (_instance, state) => {

@@ -1,4 +1,9 @@
 import type { DraftCueInputBody } from "./api";
+
+/** Name of the server-seeded `college-demo-v1` scenario. Must match the committed fixture. */
+export const FIXTURE_EVENT_NAME =
+  "Sahyadri Institute TechFest 2026 — Inaugural Session";
+
 export const FIXTURE_CUES: DraftCueInputBody[] = [
   {
     id: "opening",

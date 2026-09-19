@@ -201,6 +201,21 @@ describe('rejection and fallback', () => {
     );
     expect(out.fallbackReason).toBe('no provider credential configured');
   });
+
+  it('uses readable Gujarati in the fallback rather than corrupted text', async () => {
+    const out = await generateScriptDraft(
+      buildEnvelope(FIXTURE, 'introduction', 'gu', 'keynote'),
+      { ...AI_ON, AI_ENABLED: 'false' },
+      returning({}),
+    );
+    expect(out.source).toBe('template');
+    expect(out.body).toContain('Dr. Ananya Mehta');
+    expect(out.body).toContain('સ્વાગત');
+    expect(out.body).not.toContain('સ્વાદેવું');
+    expect(out.body).not.toContain('સે કોી');
+    // §18: unreviewed languages are labelled, never claimed as checked.
+    expect(out.warnings).toContain('generated; language quality unverified');
+  });
 });
 
 describe('time detection warns, never blocks', () => {
