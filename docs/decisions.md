@@ -328,3 +328,24 @@ A single run showed `294 passed | 1 failed` while `docs/measurements.md` was bei
 the same command. Six subsequent full runs were clean. It is recorded here rather than ignored,
 because an intermittent failure that nobody wrote down is one that gets rediscovered at H20.
 If it recurs, the shared `QuotaRoom` across parallel API test files is the first place to look.
+
+## 2026-09-19 - the master report's model references are superseded
+
+The report is the authoritative spec and is not edited. These two places name a model that is
+no longer callable, and anything derived from them must be corrected before it is presented:
+
+- **§7B** ("Use Gemini 2.5 Flash-Lite ... through a server-side adapter") and the **§10 stack
+  table** ("AI | Gemini 2.5 Flash-Lite through an adapter"). Superseded: the deployed adapter
+  calls **`gemini-3.5-flash-lite`**. §7B's own condition - *"if available in the team's project
+  at H1"* - is what authorises the swap.
+- **§16's cost model** computes "$2/month" for 5,000 drafts from "the listed Flash-Lite paid
+  text rates of $0.10/million input and $0.40/million output". **Those are 2.5-flash-lite's
+  published rates.** We now call a different model, so that figure is for a model we do not
+  use. **Do not present it as current pricing.** It must be recomputed against
+  3.5-flash-lite's published rates, with the check date recorded, before it appears in a
+  README, deck or answer. §16 already frames it as "an engineering allowance, not a provider
+  quote"; it is now also a *stale* one.
+
+Sweep result on 2026-09-19: no source file, config file, test or committed artifact names 2.5
+as the model in use. The only remaining mentions are the deliberate historical records in
+`docs/decisions.md` and `docs/measurements.md` that quote the provider's 404 and §7B itself.
