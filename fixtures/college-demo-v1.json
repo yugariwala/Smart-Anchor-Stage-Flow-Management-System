@@ -1,7 +1,7 @@
 {
   "id": "college-demo-v1",
   "ownerUid": "demo-owner-uid",
-  "name": "Sahyadri Institute TechFest 2026 — Inaugural Session",
+  "name": "Sahyadri Institute TechFest 2026 \u2014 Inaugural Session",
   "timezone": "Asia/Kolkata",
   "startsAt": "2026-09-19T04:30:00Z",
   "hardEndMin": 60,
@@ -13,9 +13,18 @@
   "activeForecastEndMin": 25,
   "scheduleHealth": "valid",
   "eventFacts": [
-    { "id": "event:name", "text": "Sahyadri Institute TechFest 2026 — Inaugural Session" },
-    { "id": "event:venue", "text": "Fictional venue: Kalpana Chawla Auditorium, Block C." },
-    { "id": "event:audience", "text": "Approximately 300 fictional student attendees." }
+    {
+      "id": "event:name",
+      "text": "Sahyadri Institute TechFest 2026 \u2014 Inaugural Session"
+    },
+    {
+      "id": "event:venue",
+      "text": "Fictional venue: Kalpana Chawla Auditorium, Block C."
+    },
+    {
+      "id": "event:audience",
+      "text": "Approximately 300 fictional student attendees."
+    }
   ],
   "speakers": [
     {
@@ -23,9 +32,18 @@
       "displayName": "Dr. Ananya Mehta",
       "pronunciationHint": "uh-NAHN-yuh MEH-tah",
       "facts": [
-        { "id": "speaker:spk-mehta:name", "text": "Dr. Ananya Mehta" },
-        { "id": "fact-mehta-1", "text": "Fictional: heads the Applied Systems Lab at a fictional institute." },
-        { "id": "fact-mehta-2", "text": "Fictional: speaking on scheduling under real-world constraints." }
+        {
+          "id": "speaker:spk-mehta:name",
+          "text": "Dr. Ananya Mehta"
+        },
+        {
+          "id": "fact-mehta-1",
+          "text": "Fictional: heads the Applied Systems Lab at a fictional institute."
+        },
+        {
+          "id": "fact-mehta-2",
+          "text": "Fictional: speaking on scheduling under real-world constraints."
+        }
       ]
     },
     {
@@ -33,8 +51,14 @@
       "displayName": "Vikram Rao",
       "pronunciationHint": "VIK-ram RAO",
       "facts": [
-        { "id": "speaker:spk-rao:name", "text": "Vikram Rao" },
-        { "id": "fact-rao-1", "text": "Fictional: final-year student and TechFest community lead." }
+        {
+          "id": "speaker:spk-rao:name",
+          "text": "Vikram Rao"
+        },
+        {
+          "id": "fact-rao-1",
+          "text": "Fictional: final-year student and TechFest community lead."
+        }
       ]
     },
     {
@@ -42,8 +66,14 @@
       "displayName": "Priya Fernandes",
       "pronunciationHint": "PREE-yah fer-NAN-dez",
       "facts": [
-        { "id": "speaker:spk-fernandes:name", "text": "Priya Fernandes" },
-        { "id": "fact-fernandes-1", "text": "Fictional: represents the fictional sponsor Northwind Labs." }
+        {
+          "id": "speaker:spk-fernandes:name",
+          "text": "Priya Fernandes"
+        },
+        {
+          "id": "fact-fernandes-1",
+          "text": "Fictional: represents the fictional sponsor Northwind Labs."
+        }
       ]
     }
   ],
@@ -63,7 +93,8 @@
       "plannedEndMin": 5,
       "status": "completed",
       "actualStartAt": "2026-09-19T04:30:00Z",
-      "actualEndAt": "2026-09-19T04:35:00Z"
+      "actualEndAt": "2026-09-19T04:35:00Z",
+      "actualTimeSource": "rehearsal_clock"
     },
     {
       "id": "keynote",
@@ -80,7 +111,8 @@
       "plannedEndMin": 25,
       "status": "active",
       "actualStartAt": "2026-09-19T04:35:00Z",
-      "actualEndAt": null
+      "actualEndAt": null,
+      "actualTimeSource": "rehearsal_clock"
     },
     {
       "id": "qa",
@@ -97,7 +129,8 @@
       "plannedEndMin": 35,
       "status": "pending",
       "actualStartAt": null,
-      "actualEndAt": null
+      "actualEndAt": null,
+      "actualTimeSource": null
     },
     {
       "id": "community",
@@ -114,7 +147,8 @@
       "plannedEndMin": 45,
       "status": "pending",
       "actualStartAt": null,
-      "actualEndAt": null
+      "actualEndAt": null,
+      "actualTimeSource": null
     },
     {
       "id": "sponsor",
@@ -131,7 +165,8 @@
       "plannedEndMin": 55,
       "status": "pending",
       "actualStartAt": null,
-      "actualEndAt": null
+      "actualEndAt": null,
+      "actualTimeSource": null
     },
     {
       "id": "closing",
@@ -148,7 +183,8 @@
       "plannedEndMin": 60,
       "status": "pending",
       "actualStartAt": null,
-      "actualEndAt": null
+      "actualEndAt": null,
+      "actualTimeSource": null
     }
   ],
   "approvedScripts": [],

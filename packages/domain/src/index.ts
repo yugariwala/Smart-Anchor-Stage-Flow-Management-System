@@ -6,5 +6,6 @@ export * from './types';
 export * from './schemas';
 export * from './draft';
 export * from './repair';
+export * from './transitions';
 export * from './validatePlan';
 export * from './renderOperationalCue';

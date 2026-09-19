@@ -108,6 +108,7 @@ export function materializeDraftCues(
         status: 'pending' as const,
         actualStartAt: null,
         actualEndAt: null,
+        actualTimeSource: null,
       };
     });
 }

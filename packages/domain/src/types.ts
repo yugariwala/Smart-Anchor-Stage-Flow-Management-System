@@ -37,6 +37,15 @@ export type Cue = {
   status: 'pending' | 'active' | 'completed';
   actualStartAt: ISODate | null;
   actualEndAt: ISODate | null;
+  /**
+   * EXTENSION to §12: which clock produced `actualStartAt` / `actualEndAt`.
+   *
+   * §12 permits actual times to come from "the server clock or labeled rehearsal clock",
+   * and the runbook and audit view must never present a scenario timestamp as a real
+   * observation. The source is currently derivable from `EventState.mode`, but recording it
+   * per cue keeps a rehearsal timestamp self-describing wherever it travels.
+   */
+  actualTimeSource: 'rehearsal_clock' | 'server_clock' | null;
 };
 
 export type ScriptKind = 'opening' | 'introduction' | 'transition' | 'closing' | 'announcement';

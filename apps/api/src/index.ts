@@ -289,6 +289,60 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
     return respond(ctx, out.status, out.body);
   }
 
+
+  // POST /v1/events/{id}/repair-proposals
+  if (request.method === 'POST' && tail.length === 1 && tail[0] === 'repair-proposals') {
+    const body = await readJsonBody(request);
+    const env0 = await envelope(request, uid, path, body, serverNow);
+    // The proposal id is minted here so a retried request replays the SAME proposal from the
+    // ledger rather than creating a second one.
+    const out = await viaRoom(stub.proposeRepair({ ...env0, body, proposalId: crypto.randomUUID() }));
+    return respond(ctx, out.status, out.body);
+  }
+
+  // POST /v1/events/{id}/repair-proposals/{pid}/approve
+  if (
+    request.method === 'POST' &&
+    tail.length === 3 &&
+    tail[0] === 'repair-proposals' &&
+    tail[2] === 'approve'
+  ) {
+    const body = await readJsonBody(request);
+    const env0 = await envelope(request, uid, path, body, serverNow);
+    const out = await viaRoom(stub.approveRepair({ ...env0, body, proposalId: tail[1] as string }));
+    return respond(ctx, out.status, out.body);
+  }
+
+  // GET /v1/events/{id}/repair-proposals/{pid}
+  if (request.method === 'GET' && tail.length === 2 && tail[0] === 'repair-proposals') {
+    const out = await viaRoom(stub.getProposal(uid, tail[1] as string, serverNow));
+    return respond(ctx, out.status, out.body);
+  }
+
+  // POST /v1/events/{id}/cues/{cid}/start  and  /complete
+  if (request.method === 'POST' && tail.length === 3 && tail[0] === 'cues') {
+    const cueId = tail[1] as string;
+    const verb = tail[2];
+    if (verb === 'start' || verb === 'complete') {
+      const body = await readJsonBody(request);
+      const env0 = await envelope(request, uid, path, body, serverNow);
+      const out = await viaRoom(
+        verb === 'start'
+          ? stub.startCueCommand({ ...env0, body, cueId })
+          : stub.completeCueCommand({ ...env0, body, cueId }),
+      );
+      return respond(ctx, out.status, out.body);
+    }
+  }
+
+  // POST /v1/events/{id}/rehearsal-clock
+  if (request.method === 'POST' && tail.length === 1 && tail[0] === 'rehearsal-clock') {
+    const body = await readJsonBody(request);
+    const env0 = await envelope(request, uid, path, body, serverNow);
+    const out = await viaRoom(stub.rehearsalClockCommand({ ...env0, body }));
+    return respond(ctx, out.status, out.body);
+  }
+
   // GET /v1/events/{id}/revisions and /revisions/{rev}
   if (request.method === 'GET' && tail[0] === 'revisions') {
     if (tail.length === 1) {

@@ -68,6 +68,7 @@ export const cueSchema = z
     status: z.enum(['pending', 'active', 'completed']),
     actualStartAt: isoDateSchema.nullable(),
     actualEndAt: isoDateSchema.nullable(),
+    actualTimeSource: z.enum(['rehearsal_clock', 'server_clock']).nullable(),
   })
   .refine((c) => c.minDurationMin <= c.preferredDurationMin, {
     message: 'minDurationMin must be <= preferredDurationMin',
@@ -80,6 +81,10 @@ export const cueSchema = z
   .refine((c) => c.actualEndAt === null || c.actualStartAt !== null, {
     message: 'actualEndAt requires actualStartAt',
     path: ['actualStartAt'],
+  })
+  .refine((c) => (c.actualStartAt === null) === (c.actualTimeSource === null), {
+    message: 'actualTimeSource must be set iff an actual time was recorded',
+    path: ['actualTimeSource'],
   });
 
 /** Cue ordering must be unique and contiguous 0..n-1. */

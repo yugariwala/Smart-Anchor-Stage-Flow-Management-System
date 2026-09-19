@@ -14,19 +14,30 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import {
+  advanceRehearsalClock,
+  applyRepair,
+  completeCue,
   computeInitialIntervals,
+  currentMinute,
   draftConfigSchema,
   draftCueInputSchema,
   eventStateSchema,
   factSchema,
   materializeDraftCues,
   planIsValid,
+  previewRepair,
   publishableCuesSchema,
+  repairInputSchema,
+  sameRepairOutcome,
   speakerSchema,
+  startCue,
+  TransitionError,
   validatePlan,
   withinStateBodyLimit,
   type Cue,
   type EventState,
+  type RepairInput,
+  type RepairResult,
   type Role,
   z,
 } from '@cuepilot/domain';
@@ -50,6 +61,16 @@ const RETENTION_MS = 72 * 60 * 60 * 1000;
 const INVITATION_TTL_MS = 60 * 60 * 1000; // one use, one hour
 const REVISION_PAGE_CAP = 50;
 const TOMBSTONE_JSON = '{"tombstone":true}';
+
+/**
+ * Proposal TTL is TEN REAL WALL-CLOCK MINUTES, irrespective of the rehearsal clock (§12).
+ *
+ * TWO CLOCKS, TWO JOBS. This one is real time: a rehearsal parked at scenario minute 25 for
+ * an hour must still expire its proposals. The OTHER clock - the scenario minute - decides
+ * whether a previewed plan is still reachable, and drives PLAN_TIME_STALE. Conflating them
+ * would either keep dead proposals alive forever or expire live ones on a paused scenario.
+ */
+const PROPOSAL_TTL_MS = 10 * 60 * 1000;
 
 /** Every mutation carries these. `expectedRevision` is absent only on creation (§12, #4). */
 export type MutationEnvelope = {
@@ -94,6 +115,22 @@ const draftBodySchema = z.strictObject({
 });
 
 const expectedRevisionOnlySchema = z.strictObject({ expectedRevision: z.int().min(1) });
+
+const rehearsalClockBodySchema = z.strictObject({
+  expectedRevision: z.int().min(1),
+  nowAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/, 'must be UTC ISO-8601 ending in Z'),
+});
+
+type ProposalRow = {
+  id: string;
+  base_revision: number;
+  input_json: string;
+  result_json: string;
+  status: 'proposed' | 'accepted' | 'stale';
+  expires_at: string;
+};
 
 type StateRow = {
   revision: number;
@@ -215,6 +252,24 @@ export class EventRoom extends DurableObject<Env> {
       action,
       nowIso,
     );
+    // EAGER staleness: any new revision invalidates every outstanding proposal, because each
+    // was solved against an older base. Approval still re-checks (it is the authority); this
+    // just keeps the table honest for a future proposals list.
+    this.ctx.storage.sql.exec(
+      "UPDATE proposals SET status = 'stale' WHERE status = 'proposed'",
+    );
+  }
+
+  /** Maps a domain rule refusal onto the HTTP error contract. */
+  private runTransition(fn: () => EventState): EventState {
+    try {
+      return fn();
+    } catch (cause) {
+      if (cause instanceof TransitionError) {
+        return throwApi(cause.code, cause.message) as never;
+      }
+      throw cause;
+    }
   }
 
   /**
@@ -639,6 +694,286 @@ export class EventRoom extends DurableObject<Env> {
       this.purge(cmd.nowIso);
       return { status: 204, body: null };
     });
+  }
+
+
+  // ───────────────────────── Milestone 3: repair proposals ─────────────────────────────
+
+  /**
+   * `POST /v1/events/{id}/repair-proposals` - owner.
+   *
+   * Runs the solver against a COPY of state and stores an expiring proposal. An infeasible
+   * result is a SUCCESSFUL `201` response carrying the quantified shortage, not an error:
+   * the organizer needs to see why, and §12 requires the published plan to be untouched
+   * either way.
+   */
+  async proposeRepair(cmd: MutationEnvelope & { body: unknown; proposalId: string }): Promise<CommandResponse> {
+    const parsed = repairInputSchema.safeParse(cmd.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throwApi(
+        'VALIDATION_FAILED',
+        `Invalid repair input: ${issue === undefined ? 'unknown' : `${issue.path.join('.')} ${issue.message}`}`,
+      );
+    }
+    const input: RepairInput = parsed.data;
+
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replayOrReject(cmd);
+      if (replay !== null) return replay;
+
+      const { row, state } = this.requireAccess(cmd.uid, 'owner');
+      this.requireRevision(row, input.expectedRevision);
+      if (state.phase !== 'running') {
+        return throwApi('WRONG_PHASE', 'Repairs apply to a running event.') as never;
+      }
+
+      // The solver is pure and synchronous, so it is safe inside the transaction. It reads
+      // `state` and never writes to it.
+      const result = previewRepair(state, input, cmd.nowIso);
+
+      const expiresAt = new Date(Date.parse(cmd.nowIso) + PROPOSAL_TTL_MS)
+        .toISOString()
+        .replace(/\.\d{3}Z$/, 'Z');
+
+      this.ctx.storage.sql.exec(
+        'INSERT INTO proposals (id, kind, base_revision, input_json, result_json, status, created_by, created_at, expires_at) ' +
+          "VALUES (?, 'repair', ?, ?, ?, 'proposed', ?, ?, ?)",
+        cmd.proposalId,
+        state.revision,
+        JSON.stringify(input),
+        JSON.stringify(result),
+        cmd.uid,
+        cmd.nowIso,
+        expiresAt,
+      );
+
+      // A preview mutates nothing: no revision bump, no published pointer change, no
+      // `revisions` row. Proposals are auxiliary records (§12).
+      const response: CommandResponse = {
+        status: 201,
+        body: { proposalId: cmd.proposalId, expiresAt, result },
+      };
+      this.recordCommand(cmd, response);
+      return response;
+    });
+  }
+
+  /**
+   * `POST /v1/events/{id}/repair-proposals/{pid}/approve` - owner.
+   *
+   * Approval RECOMPUTES from the stored `input_json` and publishes THAT. It never publishes
+   * the stored `result_json`: a stored result is a preview artefact, and §12 is explicit that
+   * we must never silently publish a different repair from the one approved. The recomputed
+   * plan is compared against the preview and a divergence is refused, not applied.
+   */
+  async approveRepair(
+    cmd: MutationEnvelope & { body: unknown; proposalId: string },
+  ): Promise<CommandResponse> {
+    const parsed = expectedRevisionOnlySchema.safeParse(cmd.body);
+    if (!parsed.success) {
+      throwApi('VALIDATION_FAILED', 'Invalid body: expectedRevision is required.');
+    }
+    const expectedRevision = parsed.data.expectedRevision;
+
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replayOrReject(cmd);
+      if (replay !== null) return replay;
+
+      const { row, state } = this.requireAccess(cmd.uid, 'owner');
+      this.requireRevision(row, expectedRevision);
+
+      const rows = this.ctx.storage.sql
+        .exec<ProposalRow>(
+          "SELECT id, base_revision, input_json, result_json, status, expires_at FROM proposals WHERE id = ? AND kind = 'repair'",
+          cmd.proposalId,
+        )
+        .toArray();
+      const proposal = rows[0];
+      if (proposal === undefined) {
+        return throwApi('NOT_FOUND', 'No such proposal.') as never;
+      }
+      if (proposal.status === 'accepted') {
+        return throwApi('PROPOSAL_ALREADY_APPLIED', 'That proposal was already applied.') as never;
+      }
+      if (proposal.status === 'stale') {
+        return throwApi('PROPOSAL_STALE', 'The event changed. Preview again.') as never;
+      }
+      // TTL is real wall-clock, independent of the rehearsal clock.
+      if (Date.parse(proposal.expires_at) <= Date.parse(cmd.nowIso)) {
+        return throwApi('PROPOSAL_EXPIRED', 'That preview expired. Preview again.') as never;
+      }
+      if (proposal.base_revision !== state.revision) {
+        this.ctx.storage.sql.exec("UPDATE proposals SET status = 'stale' WHERE id = ?", cmd.proposalId);
+        return throwApi('PROPOSAL_STALE', 'The event changed. Preview again.') as never;
+      }
+
+      const stored = JSON.parse(proposal.result_json) as RepairResult;
+      if (!stored.feasible) {
+        return throwApi('PROPOSAL_INFEASIBLE', 'An infeasible repair cannot be published.') as never;
+      }
+
+      const input = JSON.parse(proposal.input_json) as RepairInput;
+
+      // RECOMPUTE. Route 1 to PLAN_TIME_STALE: with no active cue the DP cursor is
+      // max(latest completed end, current minute), so an advanced clock changes the plan.
+      const recomputed = previewRepair(state, input, cmd.nowIso);
+      if (!recomputed.feasible || !sameRepairOutcome(recomputed, stored)) {
+        return throwApi(
+          'PLAN_TIME_STALE',
+          'Time advanced and this plan is no longer reachable. Preview again.',
+        ) as never;
+      }
+
+      const next = this.runTransition(() => applyRepair(state, input, recomputed, cmd.nowIso));
+
+      // Route 2 to PLAN_TIME_STALE: with an ACTIVE cue the DP cursor is the absolute forecast
+      // end and never depends on the clock, so the recomputed plan above would be identical
+      // forever. The independent validator is what notices that the scenario minute has
+      // passed the forecast end. Without this check an active-cue event could never go
+      // stale, and the check above would pass vacuously on the fixture's main path.
+      const checks = validatePlan(
+        next,
+        recomputed.schedule,
+        { activeForecastEndMin: next.activeForecastEndMin, nowMin: currentMinute(next, cmd.nowIso) },
+      );
+      if (!planIsValid(checks)) {
+        const broke = checks
+          .filter((c) => !c.passed)
+          .map((c) => `${c.rule}${c.cueId === null ? '' : `(${c.cueId})`}`);
+        return throwApi(
+          'PLAN_TIME_STALE',
+          `Time advanced and this plan is no longer reachable (${broke.join(', ')}). Preview again.`,
+        ) as never;
+      }
+
+      const stateCheck = eventStateSchema.safeParse(next);
+      if (!stateCheck.success) {
+        return throwApi(
+          'VALIDATION_FAILED',
+          `Repair produced an invalid state: ${stateCheck.error.issues[0]?.message ?? 'unknown'}`,
+        ) as never;
+      }
+
+      this.ctx.storage.sql.exec("UPDATE proposals SET status = 'accepted' WHERE id = ?", cmd.proposalId);
+      this.commitRevision(next, cmd.uid, 'repair', next.revision, cmd.nowIso);
+
+      const response: CommandResponse = {
+        status: 200,
+        body: { revision: next.revision, publishedRevision: next.revision, state: next },
+      };
+      this.recordCommand(cmd, response);
+      return response;
+    });
+  }
+
+  // ───────────────────────── Milestone 3: cue and clock controls ───────────────────────
+
+  /** `POST /v1/events/{id}/cues/{cid}/start` - owner. Server-derived actual start. */
+  async startCueCommand(cmd: MutationEnvelope & { body: unknown; cueId: string }): Promise<CommandResponse> {
+    return this.mutateRunning(cmd, (state) => ({
+      next: this.runTransition(() => startCue(state, cmd.cueId, cmd.nowIso)),
+      action: 'cue_start',
+    }));
+  }
+
+  /** `POST /v1/events/{id}/cues/{cid}/complete` - owner. Reality is recorded regardless. */
+  async completeCueCommand(cmd: MutationEnvelope & { body: unknown; cueId: string }): Promise<CommandResponse> {
+    return this.mutateRunning(cmd, (state) => ({
+      next: this.runTransition(() => completeCue(state, cmd.cueId, cmd.nowIso)),
+      action: 'cue_complete',
+    }));
+  }
+
+  /** `POST /v1/events/{id}/rehearsal-clock` - owner, rehearsal only, strictly forward. */
+  async rehearsalClockCommand(cmd: MutationEnvelope & { body: unknown }): Promise<CommandResponse> {
+    const parsed = rehearsalClockBodySchema.safeParse(cmd.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throwApi(
+        'VALIDATION_FAILED',
+        `Invalid body: ${issue === undefined ? 'unknown' : `${issue.path.join('.')} ${issue.message}`}`,
+      );
+    }
+    const nowAt = parsed.data.nowAt;
+    return this.mutateRunning(cmd, (state) => ({
+      next: this.runTransition(() => advanceRehearsalClock(state, nowAt, cmd.nowIso)),
+      action: 'rehearsal_clock',
+    }));
+  }
+
+  /**
+   * Shared shape for the running-state commands: ledger, role, revision, then one pure
+   * domain transition, then state + revision row + published pointer in this transaction.
+   */
+  private mutateRunning(
+    cmd: MutationEnvelope & { body: unknown },
+    transition: (state: EventState) => { next: EventState; action: string },
+  ): CommandResponse {
+    const parsed = z
+      .object({ expectedRevision: z.int().min(1) })
+      .safeParse(cmd.body);
+    if (!parsed.success) {
+      throwApi('VALIDATION_FAILED', 'Invalid body: expectedRevision is required.');
+    }
+    const expectedRevision = parsed.data.expectedRevision;
+
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replayOrReject(cmd);
+      if (replay !== null) return replay;
+
+      const { row, state } = this.requireAccess(cmd.uid, 'owner');
+      this.requireRevision(row, expectedRevision);
+      if (state.phase !== 'running') {
+        return throwApi('WRONG_PHASE', 'This command applies to a running event.') as never;
+      }
+
+      const { next, action } = transition(state);
+
+      const check = eventStateSchema.safeParse(next);
+      if (!check.success) {
+        const issue = check.error.issues[0];
+        return throwApi(
+          'VALIDATION_FAILED',
+          `Invalid resulting state: ${issue === undefined ? 'unknown' : `${issue.path.join('.')} ${issue.message}`}`,
+        ) as never;
+      }
+
+      this.commitRevision(next, cmd.uid, action, next.revision, cmd.nowIso);
+      const response: CommandResponse = {
+        status: 200,
+        body: { revision: next.revision, publishedRevision: next.revision, state: next },
+      };
+      this.recordCommand(cmd, response);
+      return response;
+    });
+  }
+
+  /** `GET /v1/events/{id}/proposals/{pid}` - owner. Read-only preview retrieval. */
+  async getProposal(uid: string, proposalId: string, nowIso: string): Promise<CommandResponse> {
+    this.sweepIfExpired(nowIso);
+    this.requireAccess(uid, 'owner');
+    const rows = this.ctx.storage.sql
+      .exec<ProposalRow>(
+        'SELECT id, base_revision, input_json, result_json, status, expires_at FROM proposals WHERE id = ?',
+        proposalId,
+      )
+      .toArray();
+    const proposal = rows[0];
+    if (proposal === undefined) {
+      throwApi('NOT_FOUND', 'No such proposal.');
+    }
+    const p = proposal as ProposalRow;
+    return {
+      status: 200,
+      body: {
+        proposalId: p.id,
+        status: p.status,
+        baseRevision: p.base_revision,
+        expiresAt: p.expires_at,
+        result: JSON.parse(p.result_json) as RepairResult,
+      },
+    };
   }
 
   /** Expiry cleanup at 72 hours. Alarms may repeat, so `purge` is idempotent. */

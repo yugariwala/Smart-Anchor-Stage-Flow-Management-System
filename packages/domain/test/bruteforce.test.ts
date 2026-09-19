@@ -125,6 +125,7 @@ const buildCase = (index: number, rnd: () => number): GeneratedCase => {
       status: 'active',
       actualStartAt: ISO_START,
       actualEndAt: null,
+      actualTimeSource: 'server_clock',
     },
   ];
 
@@ -148,6 +149,7 @@ const buildCase = (index: number, rnd: () => number): GeneratedCase => {
       status: 'pending',
       actualStartAt: null,
       actualEndAt: null,
+      actualTimeSource: null,
     });
   }
 
