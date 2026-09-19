@@ -23,7 +23,7 @@ const FIXTURE: EventState = eventStateSchema.parse(fixtureJson) as EventState;
 
 const AI_ON: GeminiEnv = {
   GEMINI_API_KEY: 'test-key-not-a-real-credential',
-  GEMINI_MODEL: 'gemini-2.5-flash-lite',
+  GEMINI_MODEL: 'gemini-3.5-flash-lite',
   AI_ENABLED: 'true',
 };
 
@@ -46,7 +46,7 @@ describe('happy path', () => {
       returning({ body: 'Good morning and welcome.', usedFactIds: ['event:name'], warnings: [] }),
     );
     expect(out.source).toBe('gemini');
-    expect(out.model).toBe('gemini-2.5-flash-lite');
+    expect(out.model).toBe('gemini-3.5-flash-lite');
     expect(out.fallbackReason).toBeNull();
     expect(out.usedFactIds).toEqual(['event:name']);
   });

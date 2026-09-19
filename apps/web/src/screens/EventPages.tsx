@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import type { EventState } from "@cuepilot/domain";
-import { Button } from "@radix-ui/themes";
 import {
   ArrowRightIcon,
   PersonIcon,
@@ -11,16 +10,22 @@ import {
 import { useEvent } from "../lib/useEvent";
 import { useCommand } from "../lib/useCommand";
 import {
+  approveScript,
   deleteEvent,
+  dismissAnnouncement,
   getRevision,
   listRevisions,
   errorCopy,
+  proposeScript,
+  publishAnnouncement,
   type RevisionEntry,
+  type ScriptDraftResponse,
 } from "../lib/api";
 import { forgetEvent } from "../lib/storage";
 import { navigate, type EventPage } from "../lib/route";
 import { localTime } from "../lib/format";
 import { RehearsalBanner } from "../components/RehearsalBanner";
+import { ScriptReview } from "../components/ScriptReview";
 import {
   Loading,
   ErrorState,
@@ -80,8 +85,12 @@ export function EventPages({
           }
         />
         {page === "speakers" && <Speakers state={state} />}
-        {page === "scripts" && <Scripts state={state} />}
-        {page === "announcements" && <Announcements state={state} />}
+        {page === "scripts" && (
+          <Scripts state={state} eventId={eventId} reload={() => void reload()} />
+        )}
+        {page === "announcements" && (
+          <Announcements state={state} eventId={eventId} reload={() => void reload()} />
+        )}
         {page === "history" && <History eventId={eventId} />}
         {page === "settings" && (
           <Settings state={state} reload={() => void reload()} />
@@ -180,7 +189,22 @@ function Speakers({ state }: { state: EventState }) {
     </>
   );
 }
-function Scripts({ state }: { state: EventState }) {
+function Scripts({
+  state,
+  eventId,
+  reload,
+}: {
+  state: EventState;
+  eventId: string;
+  reload: () => void;
+}) {
+  const command = useCommand();
+  const [draft, setDraft] = useState<ScriptDraftResponse | null>(null);
+  const [kind, setKind] = useState<
+    "opening" | "introduction" | "transition" | "closing" | "announcement"
+  >("opening");
+  const [cueId, setCueId] = useState<string>("");
+  const [language, setLanguage] = useState<"en" | "hi" | "gu">("en");
   const [selected, setSelected] = useState<string>("all");
   const [reviewId, setReviewId] = useState<string | null>(null);
   const scripts = state.approvedScripts.filter(
@@ -196,14 +220,118 @@ function Scripts({ state }: { state: EventState }) {
       <section className="capability-note">
         <ReaderIcon />
         <div>
-          <strong>Script generation is not available yet</strong>
+          <strong>Draft host copy from approved facts</strong>
           <p>
-            The backend’s draft and approval endpoints are not implemented.
-            Existing approved copy appears below.
+            The model only ever sees facts you approved, and it never sets a time. Every draft
+            is reviewed by you before it reaches the stage.
           </p>
         </div>
-        <Button disabled>Generate draft</Button>
       </section>
+
+      <div className="card">
+        <h2>Generate a draft</h2>
+        <div className="row">
+          <label className="row small">
+            Kind
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as typeof kind)}
+            >
+              <option value="opening">Opening</option>
+              <option value="introduction">Speaker introduction</option>
+              <option value="transition">Transition</option>
+              <option value="closing">Closing</option>
+              <option value="announcement">Announcement</option>
+            </select>
+          </label>
+          <label className="row small">
+            Cue
+            <select value={cueId} onChange={(e) => setCueId(e.target.value)}>
+              <option value="">No specific cue</option>
+              {state.cues.map((cue) => (
+                <option key={cue.id} value={cue.id}>
+                  {cue.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="row small">
+            Language
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as typeof language)}
+            >
+              {Object.entries(languageNames).map(([code, name]) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="primary"
+            disabled={command.status === "pending"}
+            onClick={() => {
+              void command
+                .run(`script:${state.revision}:${kind}:${cueId}:${language}`, (key) =>
+                  proposeScript(
+                    eventId,
+                    {
+                      expectedRevision: state.revision,
+                      kind,
+                      cueId: cueId === "" ? null : cueId,
+                      language,
+                    },
+                    key,
+                  ),
+                )
+                .then((result) => {
+                  if (result) setDraft(result);
+                });
+            }}
+          >
+            {command.status === "pending" ? "Drafting\u2026" : "Generate draft"}
+          </button>
+        </div>
+        {language !== "en" && (
+          <p className="small muted">
+            Hindi and Gujarati output is marked \u201cgenerated; language quality unverified\u201d
+            until a qualified reviewer has read it.
+          </p>
+        )}
+        <CommandNotice status={command.status} message={command.message} />
+      </div>
+
+      {draft && (
+        <ScriptReview
+          state={state}
+          draft={draft}
+          busy={command.status === "pending"}
+          message={command.status === "failed" ? command.message : ""}
+          onDiscard={() => {
+            setDraft(null);
+            command.reset();
+          }}
+          onApprove={(body, usedFactIds) => {
+            void command
+              .run(`approve-script:${draft.proposalId}`, (key) =>
+                approveScript(
+                  eventId,
+                  draft.proposalId,
+                  { expectedRevision: state.revision, body, usedFactIds },
+                  key,
+                ),
+              )
+              .then((result) => {
+                if (result) {
+                  setDraft(null);
+                  reload();
+                }
+              });
+          }}
+        />
+      )}
       <div className="section-toolbar">
         <h2>
           Approved host copy <span className="muted">({scripts.length})</span>
@@ -290,8 +418,19 @@ function Scripts({ state }: { state: EventState }) {
     </>
   );
 }
-function Announcements({ state }: { state: EventState }) {
+function Announcements({
+  state,
+  eventId,
+  reload,
+}: {
+  state: EventState;
+  eventId: string;
+  reload: () => void;
+}) {
+  const command = useCommand();
   const [filter, setFilter] = useState("active");
+  const [text, setText] = useState("");
+  const [language, setLanguage] = useState<"en" | "hi" | "gu">("en");
   const messages = state.announcements.filter(
     (a) => filter === "all" || a.dismissedAt === null,
   );
@@ -300,14 +439,73 @@ function Announcements({ state }: { state: EventState }) {
       <section className="capability-note">
         <SpeakerLoudIcon />
         <div>
-          <strong>Announcement publishing is not available yet</strong>
+          <strong>Publish a message to your anchor</strong>
           <p>
-            The backend’s publish and dismiss endpoints are not implemented.
-            Existing messages remain visible.
+            You write every word. Publishing is the approval step, and the message travels in
+            the same published snapshot as the schedule.
           </p>
         </div>
-        <Button disabled>New announcement</Button>
       </section>
+
+      <div className="card">
+        <h2>New announcement</h2>
+        <div className="field">
+          <label htmlFor="ann-text">Message</label>
+          <textarea
+            id="ann-text"
+            rows={3}
+            maxLength={500}
+            value={text}
+            lang={language}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Type the exact words the anchor should see."
+          />
+          <span className="small muted">{text.length}/500 characters</span>
+        </div>
+        <div className="row">
+          <label className="row small">
+            Language
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as typeof language)}
+            >
+              {Object.entries(languageNames).map(([code, name]) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="primary"
+            disabled={command.status === "pending" || text.trim().length === 0}
+            onClick={() => {
+              void command
+                .run(`announce:${state.revision}`, (key) =>
+                  publishAnnouncement(
+                    eventId,
+                    { expectedRevision: state.revision, text: text.trim(), language },
+                    key,
+                  ),
+                )
+                .then((result) => {
+                  if (result) {
+                    setText("");
+                    reload();
+                  }
+                });
+            }}
+          >
+            {command.status === "pending" ? "Publishing\u2026" : "Publish announcement"}
+          </button>
+        </div>
+        <p className="small muted">
+          CuePilot never writes an announcement for you. There is no automatic emergency
+          wording.
+        </p>
+        <CommandNotice status={command.status} message={command.message} />
+      </div>
       <div className="section-toolbar">
         <div
           className="segmented"
@@ -353,7 +551,21 @@ function Announcements({ state }: { state: EventState }) {
               {message.text}
             </p>
             {!message.dismissedAt && (
-              <button disabled>Dismiss unavailable</button>
+              <button
+                type="button"
+                disabled={command.status === "pending"}
+                onClick={() => {
+                  void command
+                    .run(`dismiss:${message.id}`, (key) =>
+                      dismissAnnouncement(eventId, message.id, state.revision, key),
+                    )
+                    .then((result) => {
+                      if (result) reload();
+                    });
+                }}
+              >
+                Dismiss banner
+              </button>
             )}
           </article>
         ))

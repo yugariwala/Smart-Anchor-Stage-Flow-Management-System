@@ -10,7 +10,7 @@
   "vars": {
     "FIREBASE_PROJECT_ID": "smart-anchor-stage-flow-system",
     "ALLOWED_ORIGINS": "http://localhost:5173",
-    "GEMINI_MODEL": "gemini-2.5-flash-lite",
+    "GEMINI_MODEL": "gemini-3.5-flash-lite",
     "AI_ENABLED": "false",
     "APP_ENV": "dev",
     "BUILD_COMMIT": "dev"

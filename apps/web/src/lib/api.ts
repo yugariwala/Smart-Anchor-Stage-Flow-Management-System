@@ -366,9 +366,64 @@ export const acknowledge = (
   });
 
 /** Approved script copy for the anchor. */
-export const scriptProposals = (): never => {
-  throw new Error("not implemented: Milestone 5");
+export type ScriptDraftResponse = {
+  proposalId: string;
+  baseRevision: number;
+  body: string;
+  usedFactIds: string[];
+  warnings: string[];
+  /** Which pipeline produced the words. `template` is never an AI success. */
+  source: "gemini" | "template";
+  model: string | null;
+  /** Why a template stood in, when it did. */
+  fallbackReason: string | null;
+  /** Exactly the facts the server gave the model, including its own reserved records. */
+  approvedFacts: Array<{ id: string; text: string }>;
+  expiresAt: string;
 };
+
+export const proposeScript = (
+  eventId: string,
+  body: {
+    expectedRevision: number;
+    kind: "opening" | "introduction" | "transition" | "closing" | "announcement";
+    cueId: string | null;
+    language: "en" | "hi" | "gu";
+  },
+  idempotencyKey: string,
+): Promise<ScriptDraftResponse | null> =>
+  call(`/events/${eventId}/script-proposals`, { method: "POST", body, idempotencyKey });
+
+export const approveScript = (
+  eventId: string,
+  proposalId: string,
+  body: { expectedRevision: number; body: string; usedFactIds: string[] },
+  idempotencyKey: string,
+): Promise<{ revision: number; scriptId: string; publishedRevision: number | null } | null> =>
+  call(`/events/${eventId}/script-proposals/${proposalId}/approve`, {
+    method: "POST",
+    body,
+    idempotencyKey,
+  });
+
+export const publishAnnouncement = (
+  eventId: string,
+  body: { expectedRevision: number; text: string; language: "en" | "hi" | "gu" },
+  idempotencyKey: string,
+): Promise<{ revision: number; announcementId: string; publishedRevision: number | null } | null> =>
+  call(`/events/${eventId}/announcements`, { method: "POST", body, idempotencyKey });
+
+export const dismissAnnouncement = (
+  eventId: string,
+  announcementId: string,
+  expectedRevision: number,
+  idempotencyKey: string,
+): Promise<{ revision: number; publishedRevision: number | null } | null> =>
+  call(`/events/${eventId}/announcements/${announcementId}/dismiss`, {
+    method: "POST",
+    body: { expectedRevision },
+    idempotencyKey,
+  });
 
 export type RevisionEntry = {
   revision: number;

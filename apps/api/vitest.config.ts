@@ -12,7 +12,7 @@ export default defineConfig({
         bindings: {
           FIREBASE_PROJECT_ID: 'test-project',
           ALLOWED_ORIGINS: 'http://localhost:5173',
-          GEMINI_MODEL: 'gemini-2.5-flash-lite',
+          GEMINI_MODEL: 'gemini-3.5-flash-lite',
           AI_ENABLED: 'false',
           APP_ENV: 'test',
           BUILD_COMMIT: 'test',
