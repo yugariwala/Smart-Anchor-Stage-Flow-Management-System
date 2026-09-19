@@ -1,6 +1,6 @@
 import { Dialog, Button } from "@radix-ui/themes";
 import { Cross2Icon, ReloadIcon } from "@radix-ui/react-icons";
-import { Component, type ReactNode } from "react";
+import { Component, useRef, type ReactNode } from "react";
 
 export function PageHeading({
   title,
@@ -98,6 +98,7 @@ export function Modal({
   children: ReactNode;
   busy?: boolean;
 }) {
+  const returnFocus = useRef<HTMLElement | null>(null);
   return (
     <Dialog.Root
       open={open}
@@ -108,6 +109,19 @@ export function Modal({
       <Dialog.Content
         maxWidth="880px"
         className="modal-content"
+        onOpenAutoFocus={() => {
+          returnFocus.current =
+            document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          const target = returnFocus.current?.isConnected
+            ? returnFocus.current
+            : document.querySelector<HTMLElement>("main");
+          target?.focus({ preventScroll: true });
+        }}
         onEscapeKeyDown={(event) => {
           if (busy) event.preventDefault();
         }}

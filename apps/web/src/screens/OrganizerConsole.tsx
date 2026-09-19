@@ -43,6 +43,8 @@ import { useSnapshotPoll } from "../lib/useSnapshotPoll";
 import { FreshnessChip, StaleSnapshotNotice } from "../components/Freshness";
 import { RehearsalBanner } from "../components/RehearsalBanner";
 import { RepairPreviewPanel } from "../components/RepairPreview";
+import { StageOverview } from "../components/StageOverview";
+import { ReadinessReminder } from "../components/ReadinessReminder";
 import { Modal, CommandNotice, Loading, PageHeading } from "../components/UI";
 
 const ACK_POLL_MS = 10_000;
@@ -389,46 +391,35 @@ export function OrganizerConsole({
           </p>
         ) : null}
 
+        <p className="sr-only" aria-live="polite">
+          {envelope?.publishedRevision
+            ? `Published runbook revision ${envelope.publishedRevision}.`
+            : "Draft runbook. Not yet published."}
+        </p>
+        <StageOverview
+          state={state}
+          nowAt={state.scenarioNowAt ?? poll.serverNowIso}
+          revision={envelope?.publishedRevision ?? null}
+          freshness={poll.freshness}
+        />
+        {envelope?.publishedRevision !== null && (
+          <ReadinessReminder
+            state={state}
+            nowAt={state.scenarioNowAt ?? poll.serverNowIso}
+            freshness={poll.freshness}
+            onReplan={(cueId) => {
+              setReleaseCue(cueId);
+              const details =
+                document.querySelector<HTMLDetailsElement>(".release-controls");
+              if (details) details.open = true;
+              window.setTimeout(() => {
+                document.getElementById("releaseMinute")?.focus();
+              }, 0);
+            }}
+          />
+        )}
         <div className="console-grid">
           <div>
-            <div className="card console-now">
-              <div className="row spread">
-                <h2>
-                  {state.phase === "ended" ? "Event complete" : "On stage"}
-                </h2>
-                <span className="chip chip-info">
-                  {activeCue ? "Current cue" : "Between cues"}
-                </span>
-              </div>
-              <h3 className="current-cue-title">
-                {activeCue?.title ??
-                  (state.phase === "draft"
-                    ? "Your stage is taking shape."
-                    : state.phase === "ended"
-                      ? "That’s a wrap."
-                      : "Ready for the next cue.")}
-              </h3>
-              <p className="anchor-line">{view.line}</p>
-              <div className="row small muted">
-                <span>
-                  Scenario clock{" "}
-                  <strong>
-                    {state.scenarioNowAt === null
-                      ? "live"
-                      : localTimeOf(state.startsAt, state.scenarioNowAt)}
-                  </strong>
-                </span>
-                <span>
-                  Projected finish{" "}
-                  <strong>{view.projectedFinishLocal ?? "—"}</strong>
-                </span>
-                <span>
-                  Hard finish{" "}
-                  <strong>{localTime(state.startsAt, state.hardEndMin)}</strong>
-                </span>
-              </div>
-            </div>
-
             <div className="card">
               <h2>Agenda</h2>
               <div

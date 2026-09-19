@@ -59,9 +59,10 @@ export function Help() {
           backend.
         </p>
         <p>
-          AI script generation and announcement publishing are not yet
-          available. Their pages display existing approved content and explain
-          the unavailable actions. No generated copy is fabricated.
+          Script generation uses approved facts and requires your review before
+          publication. If AI is unavailable, the backend returns a clearly
+          labelled template. Announcements publish the exact words you enter and
+          can be dismissed in a new revision.
         </p>
       </section>
       <section className="card">

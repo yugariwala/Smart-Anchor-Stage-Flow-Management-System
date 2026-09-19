@@ -10,7 +10,7 @@
  */
 
 import type { EventState } from "@cuepilot/domain";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { ScriptDraftResponse } from "../lib/api";
 
@@ -29,10 +29,12 @@ const factText = (
   id: string,
 ): { text: string; reserved: boolean } | null => {
   const supplied = draft.approvedFacts.find((f) => f.id === id);
-  if (supplied) return { text: supplied.text, reserved: /^(?:event|speaker):/.test(id) };
-  const stored = [...state.eventFacts, ...state.speakers.flatMap((s) => s.facts)].find(
-    (f) => f.id === id,
-  );
+  if (supplied)
+    return { text: supplied.text, reserved: /^(?:event|speaker):/.test(id) };
+  const stored = [
+    ...state.eventFacts,
+    ...state.speakers.flatMap((s) => s.facts),
+  ].find((f) => f.id === id);
   return stored ? { text: stored.text, reserved: false } : null;
 };
 
@@ -43,6 +45,7 @@ export function ScriptReview({
   message,
   onApprove,
   onDiscard,
+  language = "en",
 }: {
   state: EventState;
   draft: ScriptDraftResponse;
@@ -50,8 +53,19 @@ export function ScriptReview({
   message: string;
   onApprove: (body: string, usedFactIds: string[]) => void;
   onDiscard: () => void;
+  language?: "en" | "hi" | "gu";
 }) {
   const [body, setBody] = useState(draft.body);
+  const [reviewed, setReviewed] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const expired = now >= Date.parse(draft.expiresAt);
+  const missingFacts = draft.usedFactIds.some(
+    (id) => factText(state, draft, id) === null,
+  );
   const edited = body.trim() !== draft.body.trim();
   const overLength = body.length > 1500;
 
@@ -59,13 +73,21 @@ export function ScriptReview({
     <section className="card">
       <div className="row spread">
         <h2>Review draft</h2>
-        <span className={`chip ${draft.source === "gemini" ? "chip-info" : "chip-warn"}`}>
+        <span
+          className={`chip ${draft.source === "gemini" ? "chip-info" : "chip-warn"}`}
+        >
           {draft.source === "gemini" ? "AI draft" : "Template"}
         </span>
       </div>
 
       {/* §11 verbatim. The label states which pipeline produced the words, always. */}
-      <p className={draft.source === "gemini" ? "notice small" : "notice notice-warn small"}>
+      <p
+        className={
+          draft.source === "gemini"
+            ? "notice small"
+            : "notice notice-warn small"
+        }
+      >
         {draft.source === "gemini" ? AI_LABEL : TEMPLATE_LABEL}
         {draft.fallbackReason ? ` (${draft.fallbackReason})` : ""}
         {draft.model ? ` · ${draft.model}` : ""}
@@ -77,8 +99,10 @@ export function ScriptReview({
           <span className="chip chip-ok">pass</span> Schema checked
         </li>
         <li>
-          <span className="chip chip-ok">pass</span> Referenced facts found (
-          {draft.usedFactIds.length})
+          <span className={`chip ${missingFacts ? "chip-warn" : "chip-ok"}`}>
+            {missingFacts ? "missing" : "pass"}
+          </span>{" "}
+          Referenced facts found ({draft.usedFactIds.length})
         </li>
         <li>
           <span className="chip chip-warn">pending</span> Human review{" "}
@@ -99,13 +123,19 @@ export function ScriptReview({
 
       <div className="script-review-grid">
         <div className="field">
-          <label htmlFor="script-body">Draft copy (edit before approving if needed)</label>
+          <label htmlFor="script-body">
+            Draft copy (edit before approving if needed)
+          </label>
           <textarea
             id="script-body"
             rows={8}
             value={body}
-            lang={"en"}
-            onChange={(e) => setBody(e.target.value)}
+            lang={language}
+            disabled={busy}
+            onChange={(e) => {
+              setBody(e.target.value);
+              setReviewed(false);
+            }}
           />
           <span className="small muted">
             {body.length}/1500 characters
@@ -132,17 +162,19 @@ export function ScriptReview({
               );
             })}
           </ul>
-          {draft.usedFactIds.some((id) => factText(state, draft, id) === null) && (
+          {missingFacts && (
             <p className="notice notice-bad small" role="alert">
-              This draft references a fact that is not in the snapshot. Do not approve it.
+              This draft references a fact that is not in the snapshot. Do not
+              approve it.
             </p>
           )}
         </div>
       </div>
 
       <p className="small muted">
-        A valid schema and resolvable fact references do not prove the copy is faithful to the
-        facts. Read the draft against the sources before approving.
+        A valid schema and resolvable fact references do not prove the copy is
+        faithful to the facts. Read the draft against the sources before
+        approving.
       </p>
 
       {message && (
@@ -151,11 +183,33 @@ export function ScriptReview({
         </p>
       )}
 
+      <label className="review-check">
+        <input
+          type="checkbox"
+          checked={reviewed}
+          disabled={busy}
+          onChange={(event) => setReviewed(event.target.checked)}
+        />
+        I reviewed the words against the approved facts and checked the
+        language.
+      </label>
+      {expired && (
+        <p className="notice notice-warn" role="status">
+          This draft has expired. Discard it and generate a new one.
+        </p>
+      )}
       <div className="row">
         <button
           type="button"
           className="primary"
-          disabled={busy || overLength || body.trim().length === 0}
+          disabled={
+            busy ||
+            overLength ||
+            body.trim().length === 0 ||
+            missingFacts ||
+            expired ||
+            !reviewed
+          }
           onClick={() => onApprove(body, draft.usedFactIds)}
         >
           {busy ? "Approving…" : "Approve and publish copy"}

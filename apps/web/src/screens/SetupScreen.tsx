@@ -298,7 +298,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
       <RehearsalBanner mode={mode} />
       <div className="page">
         <PageHeading
-          title="Make room for a great event."
+          title="Event setup"
           description="Build your agenda and define the commitments your schedule must protect."
           actions={
             <span className="chip chip-info">

@@ -27,7 +27,7 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
     .getByRole("button", { name: "Create event", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Make room for a great event." }),
+    page.getByRole("heading", { name: "Event setup" }),
   ).toBeVisible();
   const match = page.url().match(/event\/([^/]+)\/setup/);
   expect(match).not.toBeNull();
@@ -84,6 +84,19 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   await page
     .getByRole("button", { name: "Start Keynote", exact: true })
     .click();
+  await expect(
+    page.getByRole("region", { name: "Live stage overview" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "+10 min", exact: true }).click();
+  await page.getByRole("button", { name: "+5 min", exact: true }).click();
+  const reminder = page.getByRole("complementary", {
+    name: "Upcoming cue reminder",
+  });
+  await expect(reminder).toBeVisible();
+  await reminder
+    .getByRole("button", { name: "Dismiss on this screen" })
+    .click();
+  await expect(reminder).not.toBeVisible();
   await page.getByLabel("Delay in minutes").fill("19");
   await page
     .getByRole("button", { name: "Preview recovery plan", exact: true })
@@ -112,10 +125,12 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   await expect(
     anchor.getByRole("button", { name: /Acknowledged revision/ }),
   ).toBeDisabled();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: "apps/web/test-results/console-desktop.png",
     fullPage: true,
   });
+  await anchor.evaluate(() => window.scrollTo(0, 0));
   await anchor.screenshot({
     path: "apps/web/test-results/anchor-mobile.png",
     fullPage: true,
@@ -126,11 +141,57 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
     ),
   ).toBe(true);
 
+  await page.goto(`/#/event/${eventId}/scripts`);
+  await page
+    .getByRole("combobox", { name: "Kind", exact: true })
+    .selectOption("introduction");
+  await page
+    .getByRole("combobox", { name: "Cue", exact: true })
+    .selectOption({ label: "Keynote" });
+  await page
+    .getByRole("button", { name: "Generate draft", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Review draft", exact: true }),
+  ).toBeVisible({ timeout: 45_000 });
+  const approveCopy = page.getByRole("button", {
+    name: "Approve and publish copy",
+    exact: true,
+  });
+  await expect(approveCopy).toBeDisabled();
+  await page.getByRole("checkbox", { name: /I reviewed the words/ }).check();
+  await approveCopy.click();
+  await expect(
+    page.getByRole("heading", { name: "Review draft", exact: true }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "View source facts" }),
+  ).toHaveCount(1);
+  await expect(anchor.locator(".script-body").first()).toBeVisible();
+  await page.goto(`/#/event/${eventId}/announcements`);
+  const announcement =
+    "Please keep the center aisle clear for our next speaker.";
+  await page.getByLabel("Message", { exact: true }).fill(announcement);
+  await page
+    .getByRole("button", { name: "Publish announcement", exact: true })
+    .click();
+  await expect(anchor.getByText(announcement, { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Dismiss banner", exact: true })
+    .click();
+  await expect(
+    anchor.getByText(announcement, { exact: true }),
+  ).not.toBeVisible();
+  await anchor.getByRole("button", { name: /Acknowledge revision/ }).click();
+  await expect(
+    anchor.getByRole("button", { name: /Acknowledged revision/ }),
+  ).toBeDisabled();
+
   for (const [route, title] of [
-    ["speakers", "The people behind your event"],
-    ["scripts", "Give your host the right words."],
-    ["announcements", "Keep everyone in the loop."],
-    ["history", "Every change, accounted for."],
+    ["speakers", "Speakers & facts"],
+    ["scripts", "Host scripts"],
+    ["announcements", "Announcements"],
+    ["history", "Revision history"],
   ] as const) {
     await page.goto(`/#/event/${eventId}/${route}`);
     await expect(
@@ -184,6 +245,9 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open navigation" }),
+  ).toBeFocused();
 
   await anchorContext.setOffline(true);
   await expect(anchor.getByText(/Offline snapshot/)).toBeVisible({
@@ -213,5 +277,22 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
     anchor.getByText(/This event is not available to you/),
   ).toBeVisible();
   await anchorContext.close();
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page
+    .getByRole("dialog", { name: "Your workspace" })
+    .getByRole("button", { name: "Sign out", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Sign out of CuePilot?" })
+    .getByRole("button", { name: "Sign out", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "You’re signed out." }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      Object.keys(localStorage).filter((key) => key.startsWith("cuepilot:")),
+    ),
+  ).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });

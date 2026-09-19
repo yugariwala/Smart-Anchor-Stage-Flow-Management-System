@@ -7,13 +7,37 @@ import { useRoute, navigate } from "./lib/route";
 import { clearLocalData, setStorageIdentity } from "./lib/storage";
 import { Shell } from "./components/Shell";
 import { EmptyState, ErrorBoundary, Loading } from "./components/UI";
-const AnchorView = lazy(() => import('./screens/AnchorView').then(module => ({ default: module.AnchorView })));
-const JoinScreen = lazy(() => import('./screens/JoinScreen').then(module => ({ default: module.JoinScreen })));
-const Landing = lazy(() => import('./screens/Landing').then(module => ({ default: module.Landing })));
-const OrganizerConsole = lazy(() => import('./screens/OrganizerConsole').then(module => ({ default: module.OrganizerConsole })));
-const SetupScreen = lazy(() => import('./screens/SetupScreen').then(module => ({ default: module.SetupScreen })));
-const EventPages = lazy(() => import('./screens/EventPages').then(module => ({ default: module.EventPages })));
-const Help = lazy(() => import('./screens/Help').then(module => ({ default: module.Help })));
+const AnchorView = lazy(() =>
+  import("./screens/AnchorView").then((module) => ({
+    default: module.AnchorView,
+  })),
+);
+const JoinScreen = lazy(() =>
+  import("./screens/JoinScreen").then((module) => ({
+    default: module.JoinScreen,
+  })),
+);
+const Landing = lazy(() =>
+  import("./screens/Landing").then((module) => ({ default: module.Landing })),
+);
+const OrganizerConsole = lazy(() =>
+  import("./screens/OrganizerConsole").then((module) => ({
+    default: module.OrganizerConsole,
+  })),
+);
+const SetupScreen = lazy(() =>
+  import("./screens/SetupScreen").then((module) => ({
+    default: module.SetupScreen,
+  })),
+);
+const EventPages = lazy(() =>
+  import("./screens/EventPages").then((module) => ({
+    default: module.EventPages,
+  })),
+);
+const Help = lazy(() =>
+  import("./screens/Help").then((module) => ({ default: module.Help })),
+);
 
 export function App() {
   const route = useRoute();
@@ -44,7 +68,10 @@ export function App() {
       if (user) {
         setStorageIdentity(user.uid);
         setUid(user.uid);
-      } else setUid(null);
+      } else {
+        setStorageIdentity("");
+        setUid(null);
+      }
     });
   }, [login]);
   const logout = async () => {
@@ -184,7 +211,11 @@ export function App() {
   }
   return (
     <Shell route={route} uid={uid} onSignOut={logout}>
-      <ErrorBoundary key={key}><Suspense fallback={<Loading label="Opening page" />}>{content}</Suspense></ErrorBoundary>
+      <ErrorBoundary key={key}>
+        <Suspense fallback={<Loading label="Opening page" />}>
+          {content}
+        </Suspense>
+      </ErrorBoundary>
     </Shell>
   );
 }

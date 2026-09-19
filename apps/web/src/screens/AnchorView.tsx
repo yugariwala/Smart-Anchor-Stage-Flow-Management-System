@@ -24,13 +24,8 @@ import { FreshnessChip, StaleSnapshotNotice } from "../components/Freshness";
 import { RehearsalBanner } from "../components/RehearsalBanner";
 import { rememberEvent } from "../lib/storage";
 import { RunbookTable } from "./EventPages";
-
-const mmss = (totalSeconds: number): string => {
-  const sign = totalSeconds < 0 ? "-" : "";
-  const s = Math.abs(totalSeconds);
-  const m = Math.floor(s / 60);
-  return `${sign}${String(m).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-};
+import { StageOverview } from "../components/StageOverview";
+import { ReadinessReminder } from "../components/ReadinessReminder";
 
 export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
   const poll = useSnapshotPoll(eventId);
@@ -98,15 +93,6 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
       : poll.serverNowIso;
   const view = renderOperationalCue(state, nowAt);
 
-  const secondsLeft =
-    view.current === null
-      ? null
-      : Math.ceil(
-          (Date.parse(state.startsAt) +
-            view.current.endMin * 60_000 -
-            Date.parse(nowAt)) /
-            1000,
-        );
   const behind =
     ackedRevision !== null && ackedRevision < snapshot.publishedRevision;
 
@@ -193,49 +179,18 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
         lastSyncAt={poll.lastSyncAt}
       />
 
-      <section className="anchor-now">
-        <p className="anchor-label">Now</p>
-        {view.current === null ? (
-          <>
-            <h1 className="anchor-title">
-              {state.phase === "ended" ? "Event complete" : "Between cues"}
-            </h1>
-            {state.phase === "ended" ? null : (
-              <p className="anchor-time muted">
-                Waiting for the organizer to start the next cue.
-              </p>
-            )}
-          </>
-        ) : (
-          <>
-            <h1 className="anchor-title">{view.current.title}</h1>
-            <p className="anchor-time">
-              {view.current.startsAtLocal}
-              {"–"}
-              {view.current.endsAtLocal}
-              {secondsLeft === null ? null : (
-                <>
-                  {" "}
-                  <span aria-hidden="true">({mmss(secondsLeft)} left)</span>
-                </>
-              )}
-            </p>
-          </>
-        )}
-      </section>
-
-      <section className="anchor-now anchor-next">
-        <p className="anchor-label">Up next</p>
-        {view.next === null ? (
-          <h2 className="anchor-title">Nothing further scheduled</h2>
-        ) : (
-          <>
-            <h2 className="anchor-title">{view.next.title}</h2>
-            <p className="anchor-time">from {view.next.startsAtLocal}</p>
-          </>
-        )}
-      </section>
-
+      <StageOverview
+        state={state}
+        nowAt={nowAt}
+        revision={snapshot.publishedRevision}
+        freshness={poll.freshness}
+        stage
+      />
+      <ReadinessReminder
+        state={state}
+        nowAt={nowAt}
+        freshness={poll.freshness}
+      />
       <p className="anchor-line">{view.line}</p>
 
       <section className="anchor-now">
@@ -247,8 +202,8 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
             (view.current === null && script.cueId === view.next?.cueId),
         ).length === 0 ? (
           <p className="muted">
-            No approved copy for this cue yet. The organizer drafts and approves host
-            copy from the Scripts page; it appears here once approved.
+            No approved copy for this cue yet. The organizer drafts and approves
+            host copy from the Scripts page; it appears here once approved.
           </p>
         ) : (
           state.approvedScripts

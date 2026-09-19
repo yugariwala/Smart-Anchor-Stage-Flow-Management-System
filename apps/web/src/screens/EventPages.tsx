@@ -36,10 +36,10 @@ import {
 } from "../components/UI";
 
 const titles = {
-  speakers: "The people behind your event",
-  scripts: "Give your host the right words.",
-  announcements: "Keep everyone in the loop.",
-  history: "Every change, accounted for.",
+  speakers: "Speakers & facts",
+  scripts: "Host scripts",
+  announcements: "Announcements",
+  history: "Revision history",
   settings: "Event settings",
 } as const;
 const descriptions = {
@@ -86,10 +86,18 @@ export function EventPages({
         />
         {page === "speakers" && <Speakers state={state} />}
         {page === "scripts" && (
-          <Scripts state={state} eventId={eventId} reload={() => void reload()} />
+          <Scripts
+            state={state}
+            eventId={eventId}
+            reload={() => void reload()}
+          />
         )}
         {page === "announcements" && (
-          <Announcements state={state} eventId={eventId} reload={() => void reload()} />
+          <Announcements
+            state={state}
+            eventId={eventId}
+            reload={() => void reload()}
+          />
         )}
         {page === "history" && <History eventId={eventId} />}
         {page === "settings" && (
@@ -200,6 +208,8 @@ function Scripts({
 }) {
   const command = useCommand();
   const [draft, setDraft] = useState<ScriptDraftResponse | null>(null);
+  const busy = command.status === "pending" || command.status === "unknown";
+  const [draftLanguage, setDraftLanguage] = useState<"en" | "hi" | "gu">("en");
   const [kind, setKind] = useState<
     "opening" | "introduction" | "transition" | "closing" | "announcement"
   >("opening");
@@ -212,6 +222,11 @@ function Scripts({
   );
   const script = state.approvedScripts.find((item) => item.id === reviewId);
   const facts = [
+    { id: "event:name", text: state.name },
+    ...state.speakers.map((speaker) => ({
+      id: `speaker:${speaker.id}:name`,
+      text: speaker.displayName,
+    })),
     ...state.eventFacts,
     ...state.speakers.flatMap((s) => s.facts),
   ];
@@ -222,8 +237,8 @@ function Scripts({
         <div>
           <strong>Draft host copy from approved facts</strong>
           <p>
-            The model only ever sees facts you approved, and it never sets a time. Every draft
-            is reviewed by you before it reaches the stage.
+            The model only ever sees facts you approved, and it never sets a
+            time. Every draft is reviewed by you before it reaches the stage.
           </p>
         </div>
       </section>
@@ -231,9 +246,11 @@ function Scripts({
       <div className="card">
         <h2>Generate a draft</h2>
         <div className="row">
-          <label className="row small">
+          <label className="row small" htmlFor="script-kind">
             Kind
             <select
+              id="script-kind"
+              disabled={busy}
               value={kind}
               onChange={(e) => setKind(e.target.value as typeof kind)}
             >
@@ -244,9 +261,14 @@ function Scripts({
               <option value="announcement">Announcement</option>
             </select>
           </label>
-          <label className="row small">
+          <label className="row small" htmlFor="script-cue">
             Cue
-            <select value={cueId} onChange={(e) => setCueId(e.target.value)}>
+            <select
+              id="script-cue"
+              value={cueId}
+              disabled={busy}
+              onChange={(e) => setCueId(e.target.value)}
+            >
               <option value="">No specific cue</option>
               {state.cues.map((cue) => (
                 <option key={cue.id} value={cue.id}>
@@ -255,10 +277,12 @@ function Scripts({
               ))}
             </select>
           </label>
-          <label className="row small">
+          <label className="row small" htmlFor="script-language">
             Language
             <select
+              id="script-language"
               value={language}
+              disabled={busy}
               onChange={(e) => setLanguage(e.target.value as typeof language)}
             >
               {Object.entries(languageNames).map(([code, name]) => (
@@ -271,23 +295,28 @@ function Scripts({
           <button
             type="button"
             className="primary"
-            disabled={command.status === "pending"}
+            disabled={busy}
             onClick={() => {
               void command
-                .run(`script:${state.revision}:${kind}:${cueId}:${language}`, (key) =>
-                  proposeScript(
-                    eventId,
-                    {
-                      expectedRevision: state.revision,
-                      kind,
-                      cueId: cueId === "" ? null : cueId,
-                      language,
-                    },
-                    key,
-                  ),
+                .run(
+                  `script:${state.revision}:${kind}:${cueId}:${language}`,
+                  (key) =>
+                    proposeScript(
+                      eventId,
+                      {
+                        expectedRevision: state.revision,
+                        kind,
+                        cueId: cueId === "" ? null : cueId,
+                        language,
+                      },
+                      key,
+                    ),
                 )
                 .then((result) => {
-                  if (result) setDraft(result);
+                  if (result) {
+                    setDraft(result);
+                    setDraftLanguage(language);
+                  }
                 });
             }}
           >
@@ -296,18 +325,37 @@ function Scripts({
         </div>
         {language !== "en" && (
           <p className="small muted">
-            Hindi and Gujarati output is marked \u201cgenerated; language quality unverified\u201d
-            until a qualified reviewer has read it.
+            Hindi and Gujarati output is marked “generated; language quality
+            unverified” until a qualified reviewer has read it.
           </p>
         )}
-        <CommandNotice status={command.status} message={command.message} />
+        <CommandNotice
+          status={command.status}
+          message={command.message}
+          retry={() =>
+            void command
+              .retry<ScriptDraftResponse | { scriptId: string }>()
+              .then((result) => {
+                if (!result) return;
+                if ("proposalId" in result) {
+                  setDraft(result);
+                  setDraftLanguage(language);
+                } else {
+                  setDraft(null);
+                  reload();
+                }
+              })
+          }
+        />
       </div>
 
       {draft && (
         <ScriptReview
+          key={draft.proposalId}
           state={state}
           draft={draft}
-          busy={command.status === "pending"}
+          busy={busy}
+          language={draftLanguage}
           message={command.status === "failed" ? command.message : ""}
           onDiscard={() => {
             setDraft(null);
@@ -319,7 +367,7 @@ function Scripts({
                 approveScript(
                   eventId,
                   draft.proposalId,
-                  { expectedRevision: state.revision, body, usedFactIds },
+                  { expectedRevision: draft.baseRevision, body, usedFactIds },
                   key,
                 ),
               )
@@ -336,9 +384,10 @@ function Scripts({
         <h2>
           Approved host copy <span className="muted">({scripts.length})</span>
         </h2>
-        <label className="row small">
+        <label className="row small" htmlFor="script-filter-language">
           Language
           <select
+            id="script-filter-language"
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
           >
@@ -354,7 +403,7 @@ function Scripts({
       {!scripts.length ? (
         <EmptyState
           title="No approved scripts"
-          description="Your operational cue instructions still come from the published schedule. Host copy requires the script approval service."
+          description="Generate a draft above, review it against your approved facts, then publish it to the anchor."
         />
       ) : (
         scripts.map((script) => (
@@ -428,6 +477,7 @@ function Announcements({
   reload: () => void;
 }) {
   const command = useCommand();
+  const busy = command.status === "pending" || command.status === "unknown";
   const [filter, setFilter] = useState("active");
   const [text, setText] = useState("");
   const [language, setLanguage] = useState<"en" | "hi" | "gu">("en");
@@ -441,8 +491,8 @@ function Announcements({
         <div>
           <strong>Publish a message to your anchor</strong>
           <p>
-            You write every word. Publishing is the approval step, and the message travels in
-            the same published snapshot as the schedule.
+            You write every word. Publishing is the approval step, and the
+            message travels in the same published snapshot as the schedule.
           </p>
         </div>
       </section>
@@ -452,6 +502,7 @@ function Announcements({
         <div className="field">
           <label htmlFor="ann-text">Message</label>
           <textarea
+            disabled={busy}
             id="ann-text"
             rows={3}
             maxLength={500}
@@ -463,10 +514,12 @@ function Announcements({
           <span className="small muted">{text.length}/500 characters</span>
         </div>
         <div className="row">
-          <label className="row small">
+          <label className="row small" htmlFor="announcement-language">
             Language
             <select
+              id="announcement-language"
               value={language}
+              disabled={busy}
               onChange={(e) => setLanguage(e.target.value as typeof language)}
             >
               {Object.entries(languageNames).map(([code, name]) => (
@@ -479,13 +532,17 @@ function Announcements({
           <button
             type="button"
             className="primary"
-            disabled={command.status === "pending" || text.trim().length === 0}
+            disabled={busy || text.trim().length === 0}
             onClick={() => {
               void command
                 .run(`announce:${state.revision}`, (key) =>
                   publishAnnouncement(
                     eventId,
-                    { expectedRevision: state.revision, text: text.trim(), language },
+                    {
+                      expectedRevision: state.revision,
+                      text: text.trim(),
+                      language,
+                    },
                     key,
                   ),
                 )
@@ -497,14 +554,27 @@ function Announcements({
                 });
             }}
           >
-            {command.status === "pending" ? "Publishing\u2026" : "Publish announcement"}
+            {command.status === "pending"
+              ? "Publishing\u2026"
+              : "Publish announcement"}
           </button>
         </div>
         <p className="small muted">
-          CuePilot never writes an announcement for you. There is no automatic emergency
-          wording.
+          CuePilot never writes an announcement for you. There is no automatic
+          emergency wording.
         </p>
-        <CommandNotice status={command.status} message={command.message} />
+        <CommandNotice
+          status={command.status}
+          message={command.message}
+          retry={() =>
+            void command.retry<{ announcementId?: string }>().then((result) => {
+              if (result) {
+                if (result.announcementId) setText("");
+                reload();
+              }
+            })
+          }
+        />
       </div>
       <div className="section-toolbar">
         <div
@@ -553,11 +623,16 @@ function Announcements({
             {!message.dismissedAt && (
               <button
                 type="button"
-                disabled={command.status === "pending"}
+                disabled={busy}
                 onClick={() => {
                   void command
                     .run(`dismiss:${message.id}`, (key) =>
-                      dismissAnnouncement(eventId, message.id, state.revision, key),
+                      dismissAnnouncement(
+                        eventId,
+                        message.id,
+                        state.revision,
+                        key,
+                      ),
                     )
                     .then((result) => {
                       if (result) reload();

@@ -44,7 +44,10 @@ export type SnapshotState = {
 
 const cacheKey = (eventId: string): string => storageKey(`snapshot:${eventId}`);
 
-type CachedSnapshot = PublishedSnapshot & { syncedAt?: number; clockOffsetMs?: number };
+type CachedSnapshot = PublishedSnapshot & {
+  syncedAt?: number;
+  clockOffsetMs?: number;
+};
 const readCache = (eventId: string): CachedSnapshot | null => {
   try {
     const raw = localStorage.getItem(cacheKey(eventId));
@@ -59,7 +62,8 @@ const readCache = (eventId: string): CachedSnapshot | null => {
       !Array.isArray(value.state.announcements) ||
       !Number.isInteger(value.publishedRevision) ||
       !Number.isFinite(Date.parse(value.serverNow)) ||
-      !Number.isFinite(Date.parse(value.state.expiresAt)) || Date.parse(value.state.expiresAt) <= Date.now()
+      !Number.isFinite(Date.parse(value.state.expiresAt)) ||
+      Date.parse(value.state.expiresAt) <= Date.now()
     )
       return null;
     return value;
@@ -104,9 +108,13 @@ export const useSnapshotPoll = (
   const [notPublished, setNotPublished] = useState(false);
   const [error, setError] = useState<ApiCallError | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(
-    initialCache ? initialCache.syncedAt ?? Date.parse(initialCache.serverNow) : null,
+    initialCache
+      ? (initialCache.syncedAt ?? Date.parse(initialCache.serverNow))
+      : null,
   );
-  const [clockOffsetMs, setClockOffsetMs] = useState(initialCache?.clockOffsetMs ?? 0);
+  const [clockOffsetMs, setClockOffsetMs] = useState(
+    initialCache?.clockOffsetMs ?? 0,
+  );
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
 
   // First request always fetches the full snapshot, restoring the authoritative clock offset.
@@ -127,7 +135,8 @@ export const useSnapshotPoll = (
     const requestingIdentity = getStorageIdentity();
     try {
       const result = await getPublished(eventId, revisionRef.current);
-      if (!activeRef.current || requestingIdentity !== getStorageIdentity()) return;
+      if (!activeRef.current || requestingIdentity !== getStorageIdentity())
+        return;
       // A 204 (null) is a successful sync: freshness updates, the revision does not.
       if (result !== null) {
         revisionRef.current = result.publishedRevision;
@@ -137,18 +146,25 @@ export const useSnapshotPoll = (
         cacheRef.current = { ...result, clockOffsetMs: offset };
         setClockOffsetMs(offset);
       }
-      if (cacheRef.current) { cacheRef.current.syncedAt = Date.now(); writeCache(eventId, cacheRef.current); }
+      if (cacheRef.current) {
+        cacheRef.current.syncedAt = Date.now();
+        writeCache(eventId, cacheRef.current);
+      }
       setFromCache(false);
       setNotPublished(false);
       setError(null);
       setLastSyncAt(Date.now());
       failuresRef.current = 0;
     } catch (cause) {
-      if (!activeRef.current || requestingIdentity !== getStorageIdentity()) return;
+      if (!activeRef.current || requestingIdentity !== getStorageIdentity())
+        return;
       if (cause instanceof ApiCallError && cause.code === "NOT_PUBLISHED") {
         // Reaching the server and being told "not yet" IS a successful sync.
         setNotPublished(true);
-        setSnapshot(null); cacheRef.current = null; clearSnapshotCache(eventId); revisionRef.current = null;
+        setSnapshot(null);
+        cacheRef.current = null;
+        clearSnapshotCache(eventId);
+        revisionRef.current = null;
         setError(null);
         setLastSyncAt(Date.now());
         failuresRef.current = 0;
@@ -234,8 +250,13 @@ export const useSnapshotPoll = (
 
   const age =
     lastSyncAt === null ? Number.POSITIVE_INFINITY : nowMs - lastSyncAt;
-  const freshness: Freshness = fromCache ? "stale" :
-    age < AMBER_MS ? "live" : age < RED_MS ? "amber" : "stale";
+  const freshness: Freshness = fromCache
+    ? "stale"
+    : age < AMBER_MS
+      ? "live"
+      : age < RED_MS
+        ? "amber"
+        : "stale";
 
   return {
     snapshot,

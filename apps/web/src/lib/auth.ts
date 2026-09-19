@@ -49,10 +49,9 @@ const doSignIn = async (): Promise<User> => {
 
 /** Signs in anonymously, reusing the persisted session when the browser already has one. */
 export const signIn = async (): Promise<User> => {
-  pending ??= doSignIn().catch((cause: unknown) => {
-    // A failed attempt must not poison later ones.
+  pending ??= doSignIn().finally(() => {
+    // Deduplicate in-flight sign-ins, but recheck Firebase after cross-tab session changes.
     pending = null;
-    throw cause;
   });
   return pending;
 };

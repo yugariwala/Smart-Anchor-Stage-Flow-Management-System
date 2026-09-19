@@ -123,8 +123,15 @@ const call = async <T>(
   if (response.status === 204) return null;
 
   let text: string;
-  try { text = await response.text(); }
-  catch { throw new ApiCallError(0, null, "The connection ended before the response was received."); }
+  try {
+    text = await response.text();
+  } catch {
+    throw new ApiCallError(
+      0,
+      null,
+      "The connection ended before the response was received.",
+    );
+  }
   let parsed: unknown = null;
   if (text.length > 0) {
     try {
@@ -241,7 +248,12 @@ export const getEvent = async (
 ): Promise<EventEnvelope | null> => {
   const requestingIdentity = getStorageIdentity();
   const result = await call<EventEnvelope>(`/events/${eventId}`);
-  if (result && requestingIdentity && getStorageIdentity() === requestingIdentity) rememberEvent(result.state, "owner");
+  if (
+    result &&
+    requestingIdentity &&
+    getStorageIdentity() === requestingIdentity
+  )
+    rememberEvent(result.state, "owner");
   return result;
 };
 
@@ -386,20 +398,29 @@ export const proposeScript = (
   eventId: string,
   body: {
     expectedRevision: number;
-    kind: "opening" | "introduction" | "transition" | "closing" | "announcement";
+    kind:
+      "opening" | "introduction" | "transition" | "closing" | "announcement";
     cueId: string | null;
     language: "en" | "hi" | "gu";
   },
   idempotencyKey: string,
 ): Promise<ScriptDraftResponse | null> =>
-  call(`/events/${eventId}/script-proposals`, { method: "POST", body, idempotencyKey });
+  call(`/events/${eventId}/script-proposals`, {
+    method: "POST",
+    body,
+    idempotencyKey,
+  });
 
 export const approveScript = (
   eventId: string,
   proposalId: string,
   body: { expectedRevision: number; body: string; usedFactIds: string[] },
   idempotencyKey: string,
-): Promise<{ revision: number; scriptId: string; publishedRevision: number | null } | null> =>
+): Promise<{
+  revision: number;
+  scriptId: string;
+  publishedRevision: number | null;
+} | null> =>
   call(`/events/${eventId}/script-proposals/${proposalId}/approve`, {
     method: "POST",
     body,
@@ -408,10 +429,22 @@ export const approveScript = (
 
 export const publishAnnouncement = (
   eventId: string,
-  body: { expectedRevision: number; text: string; language: "en" | "hi" | "gu" },
+  body: {
+    expectedRevision: number;
+    text: string;
+    language: "en" | "hi" | "gu";
+  },
   idempotencyKey: string,
-): Promise<{ revision: number; announcementId: string; publishedRevision: number | null } | null> =>
-  call(`/events/${eventId}/announcements`, { method: "POST", body, idempotencyKey });
+): Promise<{
+  revision: number;
+  announcementId: string;
+  publishedRevision: number | null;
+} | null> =>
+  call(`/events/${eventId}/announcements`, {
+    method: "POST",
+    body,
+    idempotencyKey,
+  });
 
 export const dismissAnnouncement = (
   eventId: string,

@@ -1,5 +1,5 @@
 /**
- * Measures WCAG contrast ratios for every foreground/background pair actually used in
+ * Measures WCAG contrast ratios for selected foreground/background pairs used in
  * src/styles.css, reading the values straight out of the stylesheet's custom properties.
  *
  * Run with: node apps/web/scripts/contrast.mjs
@@ -63,6 +63,13 @@ const pairs = [
 ];
 
 const extras = [
+  ['Stage body', vars.get('text'), '#eef3e9', 4.5],
+  ['Stage muted', vars.get('text-muted'), '#eef3e9', 4.5],
+  ['Stage eyebrow', '#536c50', '#eef3e9', 4.5],
+  ['Stage pronunciation', '#52674c', '#eef3e9', 4.5],
+  ['Stage initials', '#47613a', '#dde8d3', 4.5],
+  ['Stage dark initials', '#c7dfb7', '#304a38', 4.5],
+  ['Stage overdue time (large)', vars.get('bad'), '#eef3e9', 3],
   ['Primary button label on info fill', '#ffffff', vars.get('info'), 4.5],
   ['Anchor primary button label', '#06121c', vars.get('anchor-accent'), 4.5],
   ['Anchor chip ok on surface', '#7ae0a0', vars.get('anchor-surface'), 4.5],

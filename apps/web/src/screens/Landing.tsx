@@ -25,6 +25,7 @@ import {
   type RecentEvent,
 } from "../lib/storage";
 import { useCommand } from "../lib/useCommand";
+import { eventTimingLabel } from "../lib/displayTime";
 import {
   CommandNotice,
   EmptyState,
@@ -40,6 +41,13 @@ export function Landing({ uid }: { uid: string }) {
   const [states, setStates] = useState<Record<string, EventState>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [checking, setChecking] = useState(true);
+  const [published, setPublished] = useState<Record<string, number | null>>({});
+  const [offsets, setOffsets] = useState<Record<string, number>>({});
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -63,8 +71,17 @@ export function Landing({ uid }: { uid: string }) {
             event.role === "owner"
               ? await getEvent(event.id)
               : await getPublished(event.id, null);
-          if (result && !cancelled)
+          if (result && !cancelled) {
             setStates((current) => ({ ...current, [event.id]: result.state }));
+            setPublished((current) => ({
+              ...current,
+              [event.id]: result.publishedRevision,
+            }));
+            setOffsets((current) => ({
+              ...current,
+              [event.id]: Date.parse(result.serverNow) - Date.now(),
+            }));
+          }
         } catch (cause) {
           if (!cancelled)
             setErrors((current) => ({
@@ -211,57 +228,59 @@ export function Landing({ uid }: { uid: string }) {
           </>
         }
       />
-      <section className="workspace-intro">
-        <div>
-          <span className="intro-label">
-            <span className="status-dot" /> YOUR STAGE, IN SYNC
-          </span>
-          <h2>
-            Keep the show
-            <br />
-            moving together.
-          </h2>
-          <p>
-            Prepare your rundown, protect your timing,
-            <br className="desktop-only" /> and keep your anchor on the same
-            page.
-          </p>
-          <a href="#/help" className="text-link">
-            Explore the workflow <ArrowRightIcon />
-          </a>
-        </div>
-        <div
-          className="workflow-visual"
-          aria-label="Workflow: prepare, publish, perform"
-        >
-          <div className="visual-track">
-            <span>01</span>
-            <div>
-              <strong>Prepare</strong>
-              <small>Every cue in its place</small>
-            </div>
-            <CalendarIcon />
+      {events.length === 0 && (
+        <section className="workspace-intro">
+          <div>
+            <span className="intro-label">
+              <span className="status-dot" /> YOUR STAGE, IN SYNC
+            </span>
+            <h2>
+              Keep the show
+              <br />
+              moving together.
+            </h2>
+            <p>
+              Prepare your rundown, protect your timing,
+              <br className="desktop-only" /> and keep your anchor on the same
+              page.
+            </p>
+            <a href="#/help" className="text-link">
+              Explore the workflow <ArrowRightIcon />
+            </a>
           </div>
-          <div className="visual-connector" />
-          <div className="visual-track visual-active">
-            <span>02</span>
-            <div>
-              <strong>Publish</strong>
-              <small>One approved runbook</small>
+          <div
+            className="workflow-visual"
+            aria-label="Workflow: prepare, publish, perform"
+          >
+            <div className="visual-track">
+              <span>01</span>
+              <div>
+                <strong>Prepare</strong>
+                <small>Every cue in its place</small>
+              </div>
+              <CalendarIcon />
             </div>
-            <span className="status-dot" />
-          </div>
-          <div className="visual-connector" />
-          <div className="visual-track">
-            <span>03</span>
-            <div>
-              <strong>Perform</strong>
-              <small>Everyone on the same cue</small>
+            <div className="visual-connector" />
+            <div className="visual-track visual-active">
+              <span>02</span>
+              <div>
+                <strong>Publish</strong>
+                <small>One approved runbook</small>
+              </div>
+              <span className="status-dot" />
             </div>
-            <ArrowTopRightIcon />
+            <div className="visual-connector" />
+            <div className="visual-track">
+              <span>03</span>
+              <div>
+                <strong>Perform</strong>
+                <small>Everyone on the same cue</small>
+              </div>
+              <ArrowTopRightIcon />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
       <div className="section-toolbar">
         <div className="segmented" role="group" aria-label="Filter events">
           {[
@@ -298,7 +317,9 @@ export function Landing({ uid }: { uid: string }) {
         <span>
           {checking
             ? "Checking latest status…"
-            : "Status verified with your server"}
+            : Object.keys(errors).length
+              ? "Some events could not be refreshed"
+              : "Status checked when this page opened"}
         </span>
       </div>
       {filtered.length === 0 ? (
@@ -379,7 +400,10 @@ export function Landing({ uid }: { uid: string }) {
                 )}
                 <div className="event-card-footer">
                   <span className="small muted">
-                    {event.role === "owner" ? "Organizer" : "Anchor"}
+                    {event.role === "owner" ? "Organizer" : "Anchor"} ·{" "}
+                    {published[event.id] == null
+                      ? "Unpublished"
+                      : `Published R${published[event.id]}`}
                   </span>
                   <a
                     className="text-link"
@@ -392,6 +416,11 @@ export function Landing({ uid }: { uid: string }) {
                     Open event <ArrowRightIcon />
                   </a>
                 </div>
+                {state && (
+                  <p className="event-countdown">
+                    {eventTimingLabel(state, nowMs + (offsets[event.id] ?? 0))}
+                  </p>
+                )}
                 {errors[event.id] && (
                   <button
                     className="text-button"

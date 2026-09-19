@@ -82,7 +82,13 @@ export function Shell({
           <QuestionMarkCircledIcon />
           Help & guide
         </a>
-        <button className="nav-link" onClick={() => setLogout(true)}>
+        <button
+          className="nav-link"
+          onClick={() => {
+            setMenu(false);
+            setLogout(true);
+          }}
+        >
           <ExitIcon />
           Sign out
         </button>
