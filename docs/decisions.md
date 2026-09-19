@@ -79,3 +79,96 @@ session will otherwise rediscover the hard way.
 | **`compatibility_date` = `2026-08-22`, not today** | The installed workerd binary refuses to start against a later date: *"This Worker requires compatibility date 2026-09-19, but the newest date supported by this server binary is 2026-08-22."* Pinned to the binary's ceiling. Bump when wrangler ships a newer runtime. |
 | **zod 4 only, one instance** | npm installed a second nested copy (4.4.3 in `apps/api` alongside the domain's 4.6.5). Zod 4 brands its internals with `_zod.version`, so two minors produce schemas whose types are not mutually assignable across a package boundary - it surfaced as *"The types of `_zod.version.minor` are incompatible... Type '6' is not assignable to type '4'"*. Rather than pin two copies to the same version and rely on hoisting, `apps/api` declares no `zod` dependency at all and imports `z` re-exported from `@cuepilot/domain`. One instance by construction, which is a stronger guarantee than a matching version range. |
 | **`npm audit`: 4 high left unfixed** | All one transitive chain: `@cloudflare/vitest-pool-workers` -> `miniflare` -> `sharp` (< 0.35.4) -> libheif image decoding. `miniflare` is the local emulator and is never deployed; the Worker never decodes an image. `npm audit fix --force` would downgrade the pool from 0.22 to 0.8.30, a breaking change that also loses the vitest 4 support we need. Revisit when miniflare bumps `sharp`. |
+
+## 2026-09-19 - break drills: the standard
+
+A break must fail the test **for the reason the test claims to check**, verified by direct
+observation of stored state, not by counting red tests.
+
+1. **Blast radius is weak evidence.** The M2 atomicity break took down 22 tests, but only
+   because most of them route through a publish helper. "Publish is broken" is not "the
+   rollback is broken". A storage probe - read the rows back and print revision, pointer,
+   `revisions` actions and ledger count - is what actually pins the invariant.
+2. **Write the probe as a temporary test, run it broken and restored, then delete it.**
+   Printing `2 = rolled back, 3 = leaked` next to the value makes the reading unambiguous.
+3. **A drill that stays green is the most valuable outcome**, because it names a test that is
+   worth nothing. Two happened:
+   - M2's first atomicity attempt went red for a duplicate-insert `500`, not for the rollback
+     assertion. Replaced with a proper `transactionSync` bypass.
+   - M3's approve-recompute break passed **all 24** repair tests. With `base_revision`
+     matching, `state` is byte-identical to preview time and the only free variable is the
+     clock, so `validatePlan` caught every divergence the recompute would have. The recompute
+     was genuinely undefended. Fixed by a test that tampers the stored preview into a plan
+     that is **valid but suboptimal** - `validatePlan` accepts it, only a fresh solve rejects
+     it - which is the one shape that discriminates.
+
+## 2026-09-19 - Milestone 3 rulings
+
+1. **`PROPOSAL_EXPIRED` is distinct from `PROPOSAL_STALE`.** They demand different organizer
+   actions - "you took too long" vs "the event moved, preview again" - and the UI must say
+   different things. §12's `status` CHECK allows only `proposed | accepted | stale`, so there
+   is no `expired` value: expiry is **derived** from `expires_at` and the row stays
+   `proposed`. The `proposals_expiry` index exists for exactly this.
+2. **Step-10 comparison set** is `feasible`, `weightedShorteningCost`, `projectedFinishMin`
+   and the full `schedule`. `constraintChecks` is excluded, consistent with M1 ruling #6
+   which made it a containment contract that may legitimately gain entries.
+3. **INFERRED: approval persists `activeForecastEndMin`** from the input. Without it the next
+   repair solves from the stale forecast. Marked `INFERRED` in `transitions.ts`.
+4. **INFERRED: approval persists `releaseUpdates`** into the cues' `notBeforeMin`. §12 only
+   requires storing them in `input_json` for recomputation; a later re-solve that silently
+   forgot a speaker's release time would be a correctness bug. Marked `INFERRED` in source.
+5. **Actual times come from `scenarioNowAt` in rehearsal**, and the cue records
+   `actualTimeSource: 'rehearsal_clock' | 'server_clock' | null`. This is an **extension to
+   §12's `Cue` type**. The source is currently derivable from `EventState.mode`, but
+   recording it per cue keeps a rehearsal timestamp self-describing wherever it travels, so
+   the printable runbook and audit view can never present a scenario time as a real
+   observation.
+6. **`PROPOSAL_RESULT_DIVERGED` split out of `PLAN_TIME_STALE`.** When a fresh solve differs
+   from the stored preview for a reason other than the clock, saying "time advanced" would be
+   a lie. Both are `409` and both are fixed by previewing again, but the message differs.
+7. **Staleness is marked eagerly and lazily.** Every publishing transaction runs
+   `UPDATE proposals SET status='stale' WHERE status='proposed'`, so the table is honest for a
+   future proposals list; approve re-checks and is the authority.
+
+## 2026-09-19 - Milestone 3: the two clocks
+
+`transitions.ts` and `EventRoom.approveRepair` carry this in a comment block because getting
+it wrong is silent.
+
+| Clock | Value | Job |
+|---|---|---|
+| **Real wall-clock** | `cmd.nowIso`, stamped once per request by the Worker | Proposal TTL: ten real minutes (§12, "irrespective of the rehearsal clock") |
+| **Scenario minute** | `scenarioNowAt` in rehearsal, `cmd.nowIso` in live, minus `startsAt` | Plan reachability: the DP cursor, `validatePlan`, `PLAN_TIME_STALE` |
+
+A rehearsal parked at scenario minute 25 for an hour of real time must expire its proposals
+while its plan stays reachable. Conflating the two either keeps dead previews alive forever or
+expires live ones on a paused scenario.
+
+## 2026-09-19 - `PLAN_TIME_STALE` has two routes, and route 2 is load-bearing
+
+With an **active cue** the DP cursor is `input.activeForecastEndMin`, an absolute value from
+the request. It does not depend on the clock at all, so advancing the scenario clock cannot
+change the recomputed plan. A naive "advance the clock, then approve" test would get a clean
+`200` and assert nothing.
+
+- **Route 1 - no active cue.** The cursor becomes `max(latest completed end, current minute)`,
+  so the clock genuinely moves the plan and the recompute differs.
+- **Route 2 - clock past the active forecast end.** The DP output is byte-identical, and only
+  the independent `validatePlan` notices, via `active_forecast_after_now`.
+
+Without route 2 an active-cue event could never go stale, which would be silently wrong on the
+fixture's own main path. Both are implemented and both have a test.
+
+## 2026-09-19 - Milestone 0b
+
+- **`apps/web` drops the Vite scaffold's own `typescript ~6.0.2` pin.** The monorepo keeps one
+  compiler at the root, same one-instance reasoning as zod. The scaffold's `tsconfig.app.json`
+  / `tsconfig.node.json` project-reference split was replaced by one tsconfig extending
+  `tsconfig.base.json`.
+- **The connectivity probe uses a 404 on a deliberately absent event** as its authenticated
+  check. §12's endpoint inventory has no `whoami`, and a `404` proves the token verified and
+  the caller simply is not a member, whereas a `401` would prove verification failed. That
+  distinction is the whole point of the probe.
+- **`VITE_FIREBASE_*` is public client configuration** and ships in the browser bundle by
+  design. `apps/web/.env.local` is gitignored anyway (per-developer, and the credential rules
+  above still apply to the file it came from).
