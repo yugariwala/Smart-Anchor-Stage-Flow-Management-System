@@ -818,10 +818,19 @@ export class EventRoom extends DurableObject<Env> {
       // RECOMPUTE. Route 1 to PLAN_TIME_STALE: with no active cue the DP cursor is
       // max(latest completed end, current minute), so an advanced clock changes the plan.
       const recomputed = previewRepair(state, input, cmd.nowIso);
-      if (!recomputed.feasible || !sameRepairOutcome(recomputed, stored)) {
+      if (!recomputed.feasible) {
         return throwApi(
           'PLAN_TIME_STALE',
           'Time advanced and this plan is no longer reachable. Preview again.',
+        ) as never;
+      }
+      // §12: never silently publish a different repair from the one approved. The stored
+      // result is a preview artefact and is never trusted into production - what gets
+      // published is `recomputed`, and a divergence is refused rather than reconciled.
+      if (!sameRepairOutcome(recomputed, stored)) {
+        return throwApi(
+          'PROPOSAL_RESULT_DIVERGED',
+          'This preview no longer matches what the scheduler produces. Preview again.',
         ) as never;
       }
 

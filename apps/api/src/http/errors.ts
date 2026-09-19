@@ -25,6 +25,7 @@ export type ErrorCode =
   | 'PLAN_TIME_STALE'
   | 'PROPOSAL_EXPIRED'
   | 'PROPOSAL_STALE'
+  | 'PROPOSAL_RESULT_DIVERGED'
   | 'PROPOSAL_INFEASIBLE'
   | 'PROPOSAL_ALREADY_APPLIED'
   | 'CUE_ORDER_VIOLATION'
@@ -57,6 +58,8 @@ const STATUS: Record<ErrorCode, number> = {
   PLAN_TIME_STALE: 409,
   PROPOSAL_EXPIRED: 409,
   PROPOSAL_STALE: 409,
+  // The stored preview is not what a fresh solve produces. Recoverable by previewing again.
+  PROPOSAL_RESULT_DIVERGED: 409,
   PROPOSAL_INFEASIBLE: 422,
   PROPOSAL_ALREADY_APPLIED: 409,
   CUE_ORDER_VIOLATION: 409,
