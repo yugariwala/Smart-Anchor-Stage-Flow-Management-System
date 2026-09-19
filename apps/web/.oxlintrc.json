@@ -1,8 +1,41 @@
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@cuepilot/domain",
+            "importNames": [
+              "repairSchedule",
+              "repairScheduleWithDiagnostics",
+              "previewRepair",
+              "applyRepair",
+              "validatePlan",
+              "planIsValid",
+              "computeInitialIntervals",
+              "materializeDraftCues",
+              "startCue",
+              "completeCue",
+              "advanceRehearsalClock",
+              "sameRepairOutcome",
+              "currentMinute",
+              "relativeMinutes",
+              "actualClock",
+              "minutesFrom"
+            ],
+            "message": "The frontend never computes a schedule (§24). It renders what the server published. Types and renderOperationalCue are allowed; scheduling functions are not. Any arithmetic beyond countdown display is a bug."
+          },
+          {
+            "name": "zod",
+            "message": "Import z from @cuepilot/domain so the monorepo keeps one zod instance."
+          }
+        ]
+      }
+    ]
   }
 }

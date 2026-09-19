@@ -1,108 +1,76 @@
 /**
- * Milestone 0b: a connectivity probe, not product UI.
+ * Shell: anonymous sign-in, then hash routing to one of the screens.
  *
- * It proves three things end to end: anonymous Firebase sign-in works, the public health
- * endpoint is reachable, and an authenticated request is accepted with the server-verified
- * uid. No styling, no organizer console — those are M4.
+ * Sign-in happens once, before any screen renders, because every authenticated call needs a
+ * token and a screen that renders first would fire a burst of 401s.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { ApiCallError, getEvent, health, type Health } from './lib/api';
+import { errorCopy } from './lib/api';
 import { signIn } from './lib/auth';
-
-type Probe = { label: string; status: 'pending' | 'ok' | 'failed'; detail: string };
-
-const initial: Probe[] = [
-  { label: 'Anonymous Firebase sign-in', status: 'pending', detail: '' },
-  { label: 'GET /v1/health (public)', status: 'pending', detail: '' },
-  { label: 'Authenticated request (token verified server-side)', status: 'pending', detail: '' },
-];
+import { useRoute } from './lib/route';
+import { AnchorView } from './screens/AnchorView';
+import { JoinScreen } from './screens/JoinScreen';
+import { Landing } from './screens/Landing';
+import { OrganizerConsole } from './screens/OrganizerConsole';
+import { SetupScreen } from './screens/SetupScreen';
 
 export function App() {
-  const [probes, setProbes] = useState<Probe[]>(initial);
-  const [running, setRunning] = useState(false);
-
-  const update = (index: number, status: Probe['status'], detail: string): void => {
-    setProbes((current) =>
-      current.map((p, i) => (i === index ? { ...p, status, detail } : p)),
-    );
-  };
-
-  const run = useCallback(async () => {
-    setRunning(true);
-    setProbes(initial);
-
-    let uid: string | null = null;
-    try {
-      const user = await signIn();
-      uid = user.uid;
-      update(0, 'ok', `uid ${user.uid}`);
-    } catch (cause) {
-      update(0, 'failed', cause instanceof Error ? cause.message : 'unknown error');
-      setRunning(false);
-      return;
-    }
-
-    try {
-      const result: Health = await health();
-      update(1, 'ok', `buildCommit ${result.buildCommit}`);
-    } catch (cause) {
-      update(1, 'failed', cause instanceof Error ? cause.message : 'unknown error');
-    }
-
-    // A deliberately absent event id. A 404 proves the token was VERIFIED and the caller is
-    // simply not a member; a 401 would mean verification failed. This is the authenticated
-    // probe §12's endpoint inventory has no dedicated endpoint for.
-    try {
-      await getEvent(`probe-${crypto.randomUUID()}`);
-      update(2, 'failed', 'expected 404 for an absent event, got a result');
-    } catch (cause) {
-      if (cause instanceof ApiCallError && cause.status === 404) {
-        update(2, 'ok', `404 NOT_FOUND for an absent event, so the token verified as uid ${uid}`);
-      } else if (cause instanceof ApiCallError && cause.status === 401) {
-        update(2, 'failed', `401 ${cause.code}: the server rejected the token`);
-      } else {
-        update(2, 'failed', cause instanceof Error ? cause.message : 'unknown error');
-      }
-    }
-    setRunning(false);
-  }, []);
+  const route = useRoute();
+  const [uid, setUid] = useState<string | null>(null);
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
-    void run();
-  }, [run]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const user = await signIn();
+        if (!cancelled) setUid(user.uid);
+      } catch (cause) {
+        if (!cancelled) setAuthError(errorCopy(cause));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  return (
-    <main>
-      <h1>CuePilot</h1>
-      <p>
-        <strong>REHEARSAL &middot; fictional event and speakers &middot; scenario clock.</strong>
-      </p>
-      <p>
-        Milestone 0b connectivity probe. This page is not the product; it exists to prove the
-        browser can authenticate and reach the API.
-      </p>
-      <ul>
-        {probes.map((probe) => (
-          <li key={probe.label}>
-            <code>
-              {probe.status === 'pending' ? '...' : probe.status === 'ok' ? 'PASS' : 'FAIL'}
-            </code>{' '}
-            {probe.label}
-            {probe.detail === '' ? null : <div>{probe.detail}</div>}
-          </li>
-        ))}
-      </ul>
-      <button type="button" onClick={() => void run()} disabled={running}>
-        {running ? 'Running...' : 'Run again'}
-      </button>
-      <p>
-        <small>
-          Anonymous identity is a short-lived demonstration account. Clearing browser storage
-          loses access to events it created. Demo data expires after 72 hours.
-        </small>
-      </p>
-    </main>
-  );
+  if (authError !== '') {
+    return (
+      <div className="page">
+        <h1>CuePilot</h1>
+        <p className="notice notice-bad" role="alert">
+          Could not sign in: {authError}
+        </p>
+        <p className="small muted">
+          Check that anonymous authentication is enabled for the Firebase project and that this
+          origin is an authorized domain.
+        </p>
+      </div>
+    );
+  }
+
+  if (uid === null) {
+    return (
+      <div className="page">
+        <h1>CuePilot</h1>
+        <p role="status">Signing in{'…'}</p>
+      </div>
+    );
+  }
+
+  switch (route.kind) {
+    case 'anchor':
+      return <AnchorView eventId={route.eventId} />;
+    case 'join':
+      return <JoinScreen eventId={route.eventId} />;
+    case 'console':
+      return <OrganizerConsole eventId={route.eventId} uid={uid} />;
+    case 'setup':
+      return <SetupScreen eventId={route.eventId} />;
+    case 'landing':
+    default:
+      return <Landing uid={uid} />;
+  }
 }

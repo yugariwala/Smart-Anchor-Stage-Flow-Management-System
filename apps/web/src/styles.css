@@ -1,0 +1,416 @@
+/*
+ * One stylesheet, plain CSS, custom properties. No framework, no component library.
+ *
+ * Contrast ratios for every foreground/background pair used here are MEASURED, not asserted
+ * — see docs/measurements.md for the computed figures and the script that produced them.
+ *
+ * Status is never colour-only: every state carries a text label as well.
+ */
+
+:root {
+  /* Console: light surface, dark text. */
+  --bg: #ffffff;
+  --surface: #f4f5f7;
+  --surface-2: #e8eaed;
+  --border: #6b7280;
+  --text: #17191c;
+  --text-muted: #4b5058;
+
+  /* Status. Chosen for contrast on --surface, then measured. */
+  --ok: #14562c;
+  --ok-bg: #dff3e6;
+  --warn: #6b4708;
+  --warn-bg: #fdf0d5;
+  --bad: #8a1220;
+  --bad-bg: #fbe3e6;
+  --info: #103d66;
+  --info-bg: #ddebf7;
+
+  --focus: #0b3f8f;
+
+  /* Anchor view: dark, stage-readable. */
+  --anchor-bg: #0d1014;
+  --anchor-surface: #1a1f26;
+  --anchor-text: #f5f7fa;
+  --anchor-muted: #b9c0cb;
+  --anchor-accent: #7fc8ff;
+
+  --radius: 6px;
+  --gap: 12px;
+  --tap: 44px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Devanagari',
+    'Noto Sans Gujarati', sans-serif;
+}
+
+/* Visible focus everywhere, never removed. */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Every interactive control clears the 44x44 usability target (§20). */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  min-height: var(--tap);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  min-width: var(--tap);
+  cursor: pointer;
+  background: var(--surface-2);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+button.primary {
+  background: var(--info);
+  border-color: var(--info);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+button.primary:disabled {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+
+button.danger {
+  background: var(--bad-bg);
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+/* ─────────────────────────── the mandatory §11 header ─────────────────────────────── */
+
+.rehearsal-banner {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-bottom: 2px solid var(--warn);
+  padding: 10px 16px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+/* ─────────────────────────────── layout ───────────────────────────────────────────── */
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.console-grid {
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 900px) {
+  .console-grid {
+    grid-template-columns: 1.15fr 1fr;
+    align-items: start;
+  }
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: var(--gap);
+}
+
+.card h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.spread {
+  justify-content: space-between;
+}
+
+/* ─────────────────────────────── status chips ─────────────────────────────────────── */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid currentColor;
+}
+
+.chip-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.chip-warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.chip-bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.chip-info {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+/* A shape as well as a colour, so status never depends on hue alone. */
+.chip-ok::before {
+  content: '\25cf';
+}
+.chip-warn::before {
+  content: '\25b2';
+}
+.chip-bad::before {
+  content: '\25a0';
+}
+.chip-info::before {
+  content: '\2022';
+}
+
+/* ─────────────────────────────── tables ───────────────────────────────────────────── */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--surface-2);
+}
+
+th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+tr.is-active td {
+  background: var(--info-bg);
+  font-weight: 600;
+}
+
+tr.is-completed td {
+  color: var(--text-muted);
+}
+
+td.num {
+  text-align: right;
+}
+
+.changed {
+  background: var(--warn-bg);
+  font-weight: 600;
+}
+
+/* ─────────────────────────────── anchor view ──────────────────────────────────────── */
+
+.anchor {
+  min-height: 100vh;
+  background: var(--anchor-bg);
+  color: var(--anchor-text);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.anchor .rehearsal-banner {
+  margin: -16px -16px 0;
+}
+
+.anchor-now {
+  background: var(--anchor-surface);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.anchor-label {
+  font-size: clamp(0.8rem, 2.5vw, 1rem);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--anchor-muted);
+  margin: 0 0 4px;
+}
+
+.anchor-title {
+  font-size: clamp(1.9rem, 9vw, 3.4rem);
+  line-height: 1.1;
+  margin: 0;
+  font-weight: 700;
+}
+
+.anchor-time {
+  font-size: clamp(1.1rem, 4.5vw, 1.6rem);
+  color: var(--anchor-accent);
+  margin: 6px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.anchor-next .anchor-title {
+  font-size: clamp(1.3rem, 6vw, 2.2rem);
+}
+
+.anchor-line {
+  font-size: clamp(1rem, 3.5vw, 1.25rem);
+  color: var(--anchor-text);
+  background: var(--anchor-surface);
+  border-left: 4px solid var(--anchor-accent);
+  padding: 12px 16px;
+  border-radius: var(--radius);
+}
+
+.anchor button {
+  background: var(--anchor-surface);
+  color: var(--anchor-text);
+  border-color: var(--anchor-muted);
+  min-height: 52px;
+}
+
+.anchor button.primary {
+  background: var(--anchor-accent);
+  color: #06121c;
+  border-color: var(--anchor-accent);
+}
+
+.anchor .chip {
+  background: transparent;
+}
+
+.anchor .chip-ok {
+  color: #7ae0a0;
+}
+.anchor .chip-warn {
+  color: #f5c86b;
+}
+.anchor .chip-bad {
+  color: #ff9ba6;
+}
+.anchor .chip-info {
+  color: var(--anchor-accent);
+}
+
+.anchor .muted {
+  color: var(--anchor-muted);
+}
+
+/* ─────────────────────────────── misc ─────────────────────────────────────────────── */
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.mono {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+
+.notice {
+  border-left: 4px solid var(--info);
+  background: var(--info-bg);
+  color: var(--info);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+}
+
+.notice-bad {
+  border-left-color: var(--bad);
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+
+.notice-warn {
+  border-left-color: var(--warn);
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.field label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.field .error {
+  color: var(--bad);
+  font-size: 0.85rem;
+}
+
+/* Screen-reader-only live region for revision announcements. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* §20: respect reduced motion, and never flash an overrun indicator. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none;
+  }
+}

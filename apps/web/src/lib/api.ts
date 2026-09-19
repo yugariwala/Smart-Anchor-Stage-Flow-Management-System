@@ -1,23 +1,18 @@
 /**
- * Typed client for the CuePilot Worker.
+ * The only module that talks to the Worker. Every call goes through here.
  *
- * Every mutation carries `Idempotency-Key`, and the server error shape from §12 is surfaced
- * as a typed `ApiCallError` so the UI can branch on `code` rather than on a message string.
- * `NOT_PUBLISHED` in particular is a legitimate waiting state, not a failure.
+ * The §12 error shape is surfaced as a typed `ApiCallError` so the UI branches on `code`,
+ * never on a message string. Six conflict codes demand six different user actions, so
+ * `errorCopy` keeps that mapping in one place.
  */
 
-import type { EventState } from '@cuepilot/domain';
+import type { EventState, RepairResult } from '@cuepilot/domain';
 
 import { idToken } from './auth';
 import { config } from './env';
 
 export type ApiErrorBody = {
-  error: {
-    code: string;
-    message: string;
-    currentRevision?: number;
-    retryable: boolean;
-  };
+  error: { code: string; message: string; currentRevision?: number; retryable: boolean };
 };
 
 export class ApiCallError extends Error {
@@ -30,54 +25,108 @@ export class ApiCallError extends Error {
     super(body?.error.message ?? fallback);
     this.name = 'ApiCallError';
     this.status = status;
-    this.code = body?.error.code ?? 'UNKNOWN';
+    this.code = body?.error.code ?? 'NETWORK';
     this.currentRevision = body?.error.currentRevision;
     this.retryable = body?.error.retryable ?? false;
   }
 }
 
+/**
+ * One sentence per code, because each demands a different action from the organizer.
+ * `NOT_PUBLISHED` is deliberately absent: it is a waiting state the UI renders as such, not
+ * an error, and callers check for it explicitly.
+ */
+export const errorCopy = (error: unknown): string => {
+  if (!(error instanceof ApiCallError)) {
+    return error instanceof Error ? error.message : 'Something went wrong.';
+  }
+  switch (error.code) {
+    case 'REVISION_CONFLICT':
+      return `The event changed${error.currentRevision === undefined ? '' : ` (now revision ${error.currentRevision})`}. Refresh and preview again.`;
+    case 'PROPOSAL_EXPIRED':
+      return 'This preview expired after ten minutes. Generate a new one.';
+    case 'PROPOSAL_STALE':
+      return 'The event moved on since this preview. Generate a new one.';
+    case 'PLAN_TIME_STALE':
+      return 'Time advanced and this plan is no longer reachable. Generate a new preview.';
+    case 'PROPOSAL_RESULT_DIVERGED':
+      return 'The plan changed since this preview. Generate a new one.';
+    case 'PROPOSAL_INFEASIBLE':
+      return 'This plan is not feasible and cannot be published.';
+    case 'PROPOSAL_ALREADY_APPLIED':
+      return 'That plan has already been published.';
+    case 'IDEMPOTENCY_MISMATCH':
+      return 'That action was already sent with different content. Reload and try again.';
+    case 'CUE_ORDER_VIOLATION':
+      return 'Cues run in order. Start or complete the cue the console highlights.';
+    case 'CLOCK_NOT_MONOTONIC':
+      return 'The scenario clock only moves forward.';
+    case 'CLOCK_FORBIDDEN_IN_LIVE':
+      return 'The scenario clock is only available in rehearsal mode.';
+    case 'WRONG_PHASE':
+      return 'That action does not apply at this stage of the event.';
+    case 'FORBIDDEN_ROLE':
+      return 'Only the event owner can do that.';
+    case 'NOT_FOUND':
+      return 'This event is not available to you. It may have been deleted or expired.';
+    case 'UNAUTHENTICATED':
+      return 'Your session expired. Reload the page to sign in again.';
+    case 'DEMO_CAPACITY':
+      return 'This demo has reached its daily capacity. Try again tomorrow.';
+    case 'VALIDATION_FAILED':
+      return error.message;
+    case 'NETWORK':
+      return 'Cannot reach the server.';
+    default:
+      return error.message;
+  }
+};
+
 type RequestOptions = {
   method?: 'GET' | 'PUT' | 'POST' | 'DELETE';
   body?: unknown;
-  /** Required for every mutation. Reuse the same key when retrying the same intent. */
   idempotencyKey?: string;
-  /** Treat 204 as a valid empty result instead of an error (used by the snapshot poll). */
-  allowNoContent?: boolean;
 };
 
-/** `null` means the server replied 204: nothing changed. */
+/** `null` means the server replied 204: a successful sync with nothing new. */
 const call = async <T>(path: string, options: RequestOptions = {}): Promise<T | null> => {
   const headers: Record<string, string> = { Authorization: `Bearer ${await idToken()}` };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.idempotencyKey !== undefined) headers['Idempotency-Key'] = options.idempotencyKey;
 
-  const response = await fetch(`${config.apiBaseUrl}${path}`, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body === undefined ? null : JSON.stringify(options.body),
-  });
-
-  if (response.status === 204) {
-    if (options.allowNoContent === true) return null;
-    return null;
+  let response: Response;
+  try {
+    response = await fetch(`${config.apiBaseUrl}${path}`, {
+      method: options.method ?? 'GET',
+      headers,
+      body: options.body === undefined ? null : JSON.stringify(options.body),
+    });
+  } catch {
+    // A transport failure is not an HTTP status. Surfaced as NETWORK so freshness can go red
+    // rather than the UI claiming a live sync.
+    throw new ApiCallError(0, null, 'Cannot reach the server.');
   }
-  const text = await response.text();
-  const parsed: unknown = text.length === 0 ? null : JSON.parse(text);
 
+  if (response.status === 204) return null;
+
+  const text = await response.text();
+  let parsed: unknown = null;
+  if (text.length > 0) {
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new ApiCallError(response.status, null, 'The server sent an unreadable response.');
+    }
+  }
   if (!response.ok) {
     throw new ApiCallError(response.status, parsed as ApiErrorBody | null, response.statusText);
   }
   return parsed as T;
 };
 
-export type Health = { ok: true; buildCommit: string };
+// ─────────────────────────────── shapes ──────────────────────────────────────────────────
 
-/** Public: the only endpoint that needs no token. */
-export const health = async (): Promise<Health> => {
-  const response = await fetch(`${config.apiBaseUrl}/health`);
-  if (!response.ok) throw new ApiCallError(response.status, null, 'health check failed');
-  return (await response.json()) as Health;
-};
+export type Health = { ok: true; buildCommit: string };
 
 export type EventEnvelope = {
   state: EventState;
@@ -86,33 +135,188 @@ export type EventEnvelope = {
   acknowledgments: Array<{ uid: string; revision: number; acknowledgedAt: string }>;
 };
 
-export const getEvent = (eventId: string): Promise<EventEnvelope | null> =>
-  call<EventEnvelope>(`/events/${eventId}`);
-
-export const createEvent = (
-  eventId: string,
-  body: { name: string; startsAt: string; hardEndMin: number; mode: 'rehearsal' | 'live'; seed: 'blank' },
-  idempotencyKey: string,
-): Promise<{ eventId: string; revision: number; state: EventState } | null> =>
-  call(`/events/${eventId}`, { method: 'PUT', body, idempotencyKey });
-
 export type PublishedSnapshot = {
   state: EventState;
   publishedRevision: number;
   serverNow: string;
 };
 
-/** `null` means 204: the caller's `afterRevision` is already current. */
+export type RevisionMutation = {
+  revision: number;
+  publishedRevision: number | null;
+  state: EventState;
+};
+
+export type ProposalResponse = {
+  proposalId: string;
+  expiresAt: string;
+  result: RepairResult;
+};
+
+export type CreateBody = {
+  name: string;
+  startsAt: string;
+  hardEndMin: number;
+  mode: 'rehearsal' | 'live';
+  seed: 'blank';
+};
+
+export type DraftCueInputBody = {
+  id: string;
+  order: number;
+  title: string;
+  speakerId: string | null;
+  preferredDurationMin: number;
+  minDurationMin: number;
+  compressionPenalty: number;
+  bufferBeforeMin: number;
+  notBeforeMin: number | null;
+  fixedStartMin: number | null;
+};
+
+export type DraftBody = {
+  expectedRevision: number;
+  config: { name: string; startsAt: string; hardEndMin: number };
+  speakers: Array<{
+    id: string;
+    displayName: string;
+    pronunciationHint: string;
+    facts: Array<{ id: string; text: string }>;
+  }>;
+  eventFacts: Array<{ id: string; text: string }>;
+  cues: DraftCueInputBody[];
+};
+
+// ─────────────────────────────── endpoints ───────────────────────────────────────────────
+
+/** Public: the only endpoint that needs no token. */
+export const health = async (): Promise<Health> => {
+  let response: Response;
+  try {
+    response = await fetch(`${config.apiBaseUrl}/health`);
+  } catch {
+    throw new ApiCallError(0, null, 'Cannot reach the server.');
+  }
+  if (!response.ok) throw new ApiCallError(response.status, null, 'Health check failed.');
+  return (await response.json()) as Health;
+};
+
+export const createEvent = (
+  eventId: string,
+  body: CreateBody,
+  idempotencyKey: string,
+): Promise<{ eventId: string; revision: number; state: EventState } | null> =>
+  call(`/events/${eventId}`, { method: 'PUT', body, idempotencyKey });
+
+export const getEvent = (eventId: string): Promise<EventEnvelope | null> =>
+  call<EventEnvelope>(`/events/${eventId}`);
+
+export const saveDraft = (
+  eventId: string,
+  body: DraftBody,
+  idempotencyKey: string,
+): Promise<RevisionMutation | null> =>
+  call(`/events/${eventId}/draft`, { method: 'PUT', body, idempotencyKey });
+
+export const publishEvent = (
+  eventId: string,
+  expectedRevision: number,
+  idempotencyKey: string,
+): Promise<RevisionMutation | null> =>
+  call(`/events/${eventId}/publish`, { method: 'POST', body: { expectedRevision }, idempotencyKey });
+
+/** `null` means 204: `afterRevision` is already current. Still a successful sync. */
 export const getPublished = (
   eventId: string,
   afterRevision: number | null,
 ): Promise<PublishedSnapshot | null> =>
   call<PublishedSnapshot>(
     `/events/${eventId}/published${afterRevision === null ? '' : `?afterRevision=${afterRevision}`}`,
-    { allowNoContent: true },
   );
 
-/** Everything beyond the M0b connectivity probe. */
-export const organizerConsole = (): never => {
-  throw new Error('not implemented: Milestone 4');
+export const startCueCommand = (
+  eventId: string,
+  cueId: string,
+  expectedRevision: number,
+  idempotencyKey: string,
+): Promise<RevisionMutation | null> =>
+  call(`/events/${eventId}/cues/${cueId}/start`, {
+    method: 'POST',
+    body: { expectedRevision },
+    idempotencyKey,
+  });
+
+export const completeCueCommand = (
+  eventId: string,
+  cueId: string,
+  expectedRevision: number,
+  idempotencyKey: string,
+): Promise<RevisionMutation | null> =>
+  call(`/events/${eventId}/cues/${cueId}/complete`, {
+    method: 'POST',
+    body: { expectedRevision },
+    idempotencyKey,
+  });
+
+export const setRehearsalClock = (
+  eventId: string,
+  expectedRevision: number,
+  nowAt: string,
+  idempotencyKey: string,
+): Promise<RevisionMutation | null> =>
+  call(`/events/${eventId}/rehearsal-clock`, {
+    method: 'POST',
+    body: { expectedRevision, nowAt },
+    idempotencyKey,
+  });
+
+export const proposeRepair = (
+  eventId: string,
+  body: {
+    expectedRevision: number;
+    activeForecastEndMin: number | null;
+    releaseUpdates: Array<{ cueId: string; notBeforeMin: number }>;
+  },
+  idempotencyKey: string,
+): Promise<ProposalResponse | null> =>
+  call(`/events/${eventId}/repair-proposals`, { method: 'POST', body, idempotencyKey });
+
+export const approveRepair = (
+  eventId: string,
+  proposalId: string,
+  expectedRevision: number,
+  idempotencyKey: string,
+): Promise<RevisionMutation | null> =>
+  call(`/events/${eventId}/repair-proposals/${proposalId}/approve`, {
+    method: 'POST',
+    body: { expectedRevision },
+    idempotencyKey,
+  });
+
+export const createInvitation = (
+  eventId: string,
+  idempotencyKey: string,
+): Promise<{ inviteCode: string; expiresAt: string } | null> =>
+  call(`/events/${eventId}/invitations`, {
+    method: 'POST',
+    body: { role: 'anchor' },
+    idempotencyKey,
+  });
+
+export const joinEvent = (
+  eventId: string,
+  inviteCode: string,
+  idempotencyKey: string,
+): Promise<{ role: 'anchor'; eventId: string } | null> =>
+  call(`/events/${eventId}/join`, { method: 'POST', body: { inviteCode }, idempotencyKey });
+
+export const acknowledge = (
+  eventId: string,
+  publishedRevision: number,
+): Promise<{ acknowledgedRevision: number; acknowledgedAt: string } | null> =>
+  call(`/events/${eventId}/ack`, { method: 'POST', body: { publishedRevision } });
+
+/** Approved script copy for the anchor. */
+export const scriptProposals = (): never => {
+  throw new Error('not implemented: Milestone 5');
 };
