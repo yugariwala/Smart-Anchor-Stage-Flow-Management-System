@@ -775,7 +775,10 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                 })),
                 eventFacts: [
                   {
-                    id: "event:name",
+                    // `event:` and `speaker:` are reserved for server-created records, so an
+                    // organizer fact cannot impersonate one (§12). The server synthesises the
+                    // event-name record itself at generation time.
+                    id: "fact-scenario-1",
                     text: "Fictional TechFest college rehearsal",
                   },
                 ],

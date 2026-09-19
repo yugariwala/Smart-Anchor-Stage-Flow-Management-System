@@ -19,7 +19,7 @@ env contract) govern the build. Decisions that extend or interpret the spec are 
 | Backend | Cloudflare Worker, small explicit router (no framework) |
 | Database / concurrency | SQLite-backed Durable Object per event (`EventRoom`), one shared `QuotaRoom` |
 | Authentication | Firebase anonymous auth; ID tokens verified on the Worker via Google's public JWKS (no Admin SDK, no service-account key) |
-| AI | Gemini 2.5 Flash-Lite through a server-side adapter, structured output |
+| AI | **Gemini 3.5 Flash-Lite** through a server-side adapter, structured output. §7B names 2.5, which the provider no longer serves to new projects — see `docs/decisions.md` |
 | Testing | Vitest for domain/API; a small browser end-to-end suite |
 
 Package versions are whatever `npm install` resolved; the lockfile is committed. Never
@@ -74,6 +74,13 @@ tests run. This has already happened once. The advisory is a recorded, deliberat
    demand a different action, so each gets its own copy. `NOT_PUBLISHED` is a waiting state,
    not an error.
 
+8. **Reserved fact-id prefixes.** `event:` and `speaker:` belong to the server. Organizer
+   input is refused if it uses them (`organizerFactSchema`), and the server synthesises those
+   records at generation time. This is what stops an organizer fact impersonating a source
+   record the model will trust.
+9. **A template is never an AI success.** Every draft carries `source` and, when it fell back,
+   `fallbackReason`. The §11 labels are used verbatim in the UI.
+
 ## Non-goals
 
 No telephony or phone-calling. No multi-stage or parallel tracks. No vector database or RAG
@@ -91,16 +98,17 @@ deletion, no live drag-and-drop.
 | M2 | Worker router, `EventRoom`/`QuotaRoom` SQLite DOs, Firebase token verification, create/draft/publish/published-poll/invitations/join/ack/revisions/delete, 72h expiry | **done** |
 | M3 | `renderOperationalCue`, repair proposals + approval, cue start/complete, rehearsal clock | **done** |
 | M4 | Organizer console, anchor view, setup screen, repair preview | **done**, verified live against `wrangler dev` |
-| M5 | Gemini script proposals + approval, template fallback, announcements and dismissal, the `college-demo-v1` draft seed | not started — needs `wrangler secret put GEMINI_API_KEY`. **Do not cut the script pipeline**: §25's AI beat cannot be faked (§21). |
+| M5 | Gemini script proposals + approval, template fallback, announcements and dismissal | **done**, verified against the real provider |
 | M6 | Offline snapshot cache, countdown offset, printable runbook, accessibility and localisation pass | not started |
 
 Invitations, the anchor role, acknowledgment, 72-hour expiry, deletion and sanitized logging
 landed in M2 rather than M5/M6, because the publication path needed a second identity and a
 retention story to be testable at all.
 
-**The backend and the three screens are demo-complete for §25** except the Gemini script
-beat and announcements, both M5. `docs/demo-script.md` records exactly which beats cannot be
-shot yet and the recording logistics (two pre-seeded events, second browser profile).
+**All eleven §25 beats are now implementable.** Two carry recording conditions rather than
+code gaps: the split view needs a second browser profile, and the +19 beat needs the second
+pre-seeded event. `docs/demo-script.md` has the logistics; `docs/measurements.md` has the real
+provider evidence.
 
 ## Commands
 

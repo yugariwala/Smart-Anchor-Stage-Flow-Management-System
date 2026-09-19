@@ -247,8 +247,8 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
             (view.current === null && script.cueId === view.next?.cueId),
         ).length === 0 ? (
           <p className="muted">
-            No approved copy for this cue. Script generation and approval are
-            not available in this build.
+            No approved copy for this cue yet. The organizer drafts and approves host
+            copy from the Scripts page; it appears here once approved.
           </p>
         ) : (
           state.approvedScripts

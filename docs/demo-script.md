@@ -52,17 +52,35 @@ published snapshot, acknowledged revision 9, then acknowledged revision 10 after
 approved. The console showed it first as **behind revision 9**, then as **current
 revision 10**.
 
-## Beats that currently cannot be shot
+## Beat status after Milestone 5
 
 | §25 beat | Seconds | Status |
 |---|---|---|
-| 27–42 s — Gemini introduction draft beside approved facts, approved on camera | 15 | **Not implemented.** Script proposals and the Gemini adapter are M5. §21 is explicit that a hardcoded response is not a substitute, so this beat needs the real pipeline. |
-| 120–138 s — announcement published, anchor banner | 18 | **Not implemented.** Announcements are M5. |
-| 138–153 s — forced AI failure with the template label | 15 | Depends on the beat above. |
-| 153–170 s — app diagnostics with actual results | 17 | No diagnostics screen, and none is planned. §25 permits an architecture/test-evidence slide instead; feed it from `docs/measurements.md`. |
+| 0–12 s — agenda with the fixed sponsor slot | 12 | **shootable** |
+| 12–27 s — setup: six cues, facts, minimums, fixed start | 15 | **shootable** (Setup page, "Load scenario") |
+| 27–42 s — Gemini draft beside approved facts, approved on camera | 15 | **shootable** — real drafts verified 2026-09-19, model `gemini-3.5-flash-lite` |
+| 42–55 s — organizer and anchor side by side, keynote active | 13 | **shootable**, needs a second browser profile |
+| 55–75 s — enter +12, repair preview with before/after | 20 | **shootable** |
+| 75–100 s — **money shot**: approve, anchor updates and acknowledges | 25 | **shootable**, verified live in M4 |
+| 100–120 s — +19, Publish disabled, seven-minute shortage | 20 | **shootable**, needs the second seeded event |
+| 120–138 s — announcement published, anchor banner | 18 | **shootable** — verified end to end in a browser 2026-09-19 |
+| 138–153 s — forced AI failure with the template label | 15 | **shootable** — a real provider 404 produced four labelled template fallbacks; set `AI_ENABLED=false` for a deterministic take |
+| 153–170 s — architecture / test-evidence slide | 17 | **shootable as a slide**, fed by `docs/measurements.md`. There is no diagnostics screen and none is planned. |
+| 170–180 s — name, links, closing | 10 | **shootable** |
 
-The anchor view shows an **Approved script** section with a placeholder until M5 lands, so
-the beat has a visible home rather than a missing panel.
+**All eleven beats are now implementable.** Two carry conditions rather than code gaps: the
+split view needs a second browser profile, and the +19 beat needs the second pre-seeded event.
+
+### Labelling the AI beat honestly
+
+- The model is **`gemini-3.5-flash-lite`**, not the 2.5 named in §7B. Say the real one.
+  §7B's own instruction was to check availability in the actual project.
+- The draft shown on camera must be a **real** one. If the provider is down on the day, show a
+  previously captured real request with its date and disclose the limitation (§25). Do not
+  substitute a hardcoded response.
+- If a failure is injected for the 138–153 s beat, label it **"Failure test."** on screen.
+- A template is **not** an AI success. The UI already says which pipeline produced the words,
+  and the narration must match it.
 
 ## Recording order that minimises risk
 

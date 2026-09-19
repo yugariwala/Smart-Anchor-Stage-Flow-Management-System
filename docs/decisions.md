@@ -252,3 +252,79 @@ Contrast is a measurement here, not a claim. No formal accessibility certificati
   stacks fought over port 8787. To clean up, kill the supervisor PARENTS first (the
   `node --no-warnings .../apps/api/...` processes, which are the parents of the `workerd.exe`
   processes), then the children. Killing `workerd.exe` alone just triggers a respawn.
+
+## 2026-09-19 - Milestone 5 rulings
+
+1. **Reserved fact-id prefixes are enforced at the REQUEST boundary, not in storage.**
+   `factSchema` still accepts `event:` / `speaker:` because stored state legitimately contains
+   them; `organizerFactSchema` and `organizerSpeakerSchema` refuse them on draft input, and the
+   server synthesises the records at generation time. Nothing enforced this through M2-M4 - the
+   suite's own harness was posting `event:name`, which is how it survived four milestones.
+   Four tests added, including that the rule anchors at the start so `my-event-note` is fine.
+2. **No draft cache in M5.** A deliberate cut, not a gap. The key would be
+   `sha256(model | promptVersion | language | sortedFactIds+texts | cueContextHash)` and it
+   would have to invalidate on any of those changing. §12's schema has no cache table and
+   altering it was not worth it: the per-event cap is ten drafts a day, so the saving is small,
+   and a subtly wrong cache key is worse than no cache.
+3. **Script kind and language live in `input_json`.** The `proposals` table's `kind` column is
+   constrained to `'repair'|'script'`, so the script kind (opening/introduction/...) and the
+   language ride in the JSON payload.
+4. **`source` records the GENERATOR, never whether a human edited.** An edited Gemini draft is
+   still `gemini`. Downgrading it to `manual` on edit would erase the AI evidence at the exact
+   moment a human did the review §7B requires. The review panel shows the generator label and
+   the edited/unedited status as two separate facts.
+5. **Time detection warns, never blocks**, and covers ASCII, Devanagari `[०-९]` and
+   Gujarati `[૦-૯]` digits plus am/pm, o'clock and duration phrases. A check that
+   recognised only ASCII would pass silently for exactly the two languages §20 asks us to
+   support, which is worse than having no check.
+6. **`inputHash`** = SHA-256 of the canonical `{proposalId, body}` at approval, computed in the
+   Worker before the transaction opens, like every other hash since M2.
+7. **Draft-phase approval leaves the published pointer null** (§12). Both script approval and
+   announcement publication pass the existing pointer through when `phase === 'draft'`.
+8. **The §11 template label is used verbatim even when AI was never enabled.**
+   "Template fallback - AI unavailable." reads slightly oddly for `AI_ENABLED=false`, but it is
+   accurate and §11 fixes the wording. No variant was invented. `fallbackReason` carries the
+   precise cause separately.
+9. **Quota ordering: project cap first.** The Worker reserves the project-wide AI unit before
+   the EventRoom takes its per-event day unit, so an event is never charged a unit only to be
+   refused by a project-wide condition. **The trade:** concurrent requests can over-admit the
+   project cap by at most (concurrent - 1). §12 permits this - "application caps are
+   deliberately lower than provider quotas; they do not guarantee uninterrupted service".
+10. **The AI in-flight slot is a 30-second expiring LEASE, not a lock.** A boolean flag would
+    wedge an event permanently the first time an isolate is evicted mid-generation, and with
+    ten drafts a day the organizer could not work around it. The `finally` clears it normally;
+    a crash leaves an orphan that is simply ignored once `reset_at` passes. 30s = the 12s
+    provider deadline plus margin, so a slow-but-alive generation is never double-run. Tested
+    both ways: blocked while live, recovered once backdated.
+
+## 2026-09-19 - Milestone 5: the model named in §7B is not callable
+
+`gemini-2.5-flash-lite` returns `404` for this project. The provider's own words:
+
+> "This model models/gemini-2.5-flash-lite is no longer available to new users. Please update
+> your code to use models/gemini-3.5-flash-lite for the latest features and improvements."
+
+`ListModels` confirms it is listed but not callable, while `gemini-3.5-flash-lite` is both.
+§7B anticipated exactly this: *"Use Gemini 2.5 Flash-Lite **if available in the team's project
+at H1**... Availability and quotas must be checked in the actual project; do not spend hours
+switching models."*
+
+`GEMINI_MODEL` is now `gemini-3.5-flash-lite` in `.dev.vars`, `.dev.vars.example`,
+`wrangler.jsonc` and the test config. **Every claim about the model must say 3.5-flash-lite.**
+The substitution and both evidence runs are recorded in `docs/measurements.md`.
+
+## 2026-09-19 - Milestone 5: test structure note
+
+Provider branches are tested by calling `generateScriptDraft` directly with a fake `env` and a
+fake `fetch`, NOT through the Durable Object. The test Worker runs with `AI_ENABLED=false` so
+no test can reach Google by accident - but that short-circuit also masks every provider branch,
+which is why the first eight DO-driven attempts all failed identically with
+`fallbackReason: "AI_ENABLED is false"`. The DO tests keep what only they can prove: the
+reserved-record synthesis, the lease, the per-event cap, staleness and approval.
+
+## 2026-09-19 - Milestone 5: one unreproduced test failure
+
+A single run showed `294 passed | 1 failed` while `docs/measurements.md` was being written in
+the same command. Six subsequent full runs were clean. It is recorded here rather than ignored,
+because an intermittent failure that nobody wrote down is one that gets rediscovered at H20.
+If it recurs, the shared `QuotaRoom` across parallel API test files is the first place to look.
