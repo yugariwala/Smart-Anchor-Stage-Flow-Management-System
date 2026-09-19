@@ -452,3 +452,71 @@ describe('request hygiene', () => {
     expect(denied.headers.get('Access-Control-Allow-Origin')).toBeNull();
   });
 });
+
+describe('reserved fact-id prefixes', () => {
+  /**
+   * §12 reserves `event:` and `speaker:` so an organizer-entered fact cannot impersonate a
+   * server-created source record. This was NOT enforced through M2-M4: `factSchema` accepted
+   * any nonempty id, and this suite's own harness was posting `event:name`, which is how the
+   * gap survived four milestones. The test that would have caught it:
+   */
+  it('refuses an organizer event fact that impersonates the reserved event record', async () => {
+    const owner = await mintToken('reserved-1');
+    const eventId = await createEvent(owner);
+    const body = draftBody(1) as Record<string, unknown>;
+    body.eventFacts = [{ id: 'event:name', text: 'A name the server never vouched for' }];
+    const res = await call('PUT', `/v1/events/${eventId}/draft`, {
+      token: owner,
+      body,
+      idempotencyKey: uuid(),
+    });
+    expect(res.status).toBe(422);
+    expect(await errorCode(res)).toBe('VALIDATION_FAILED');
+  });
+
+  it('refuses a speaker fact that impersonates the reserved speaker-name record', async () => {
+    const owner = await mintToken('reserved-2');
+    const eventId = await createEvent(owner);
+    const body = draftBody(1) as { speakers: Array<Record<string, unknown>> };
+    body.speakers[0] = {
+      ...(body.speakers[0] as Record<string, unknown>),
+      facts: [{ id: 'speaker:spk-mehta:name', text: 'Professor Impersonator' }],
+    };
+    const res = await call('PUT', `/v1/events/${eventId}/draft`, {
+      token: owner,
+      body,
+      idempotencyKey: uuid(),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it('accepts ordinary organizer fact ids', async () => {
+    const owner = await mintToken('reserved-3');
+    const eventId = await createEvent(owner);
+    const body = draftBody(1) as Record<string, unknown>;
+    body.eventFacts = [{ id: 'fact-ordinary-1', text: 'Fictional: an ordinary approved fact.' }];
+    const res = await call('PUT', `/v1/events/${eventId}/draft`, {
+      token: owner,
+      body,
+      idempotencyKey: uuid(),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('does not reject an id that merely contains the word event or speaker', async () => {
+    const owner = await mintToken('reserved-4');
+    const eventId = await createEvent(owner);
+    const body = draftBody(1) as Record<string, unknown>;
+    // The rule anchors at the start; these are legitimate organizer ids.
+    body.eventFacts = [
+      { id: 'my-event-note', text: 'Fictional: not a reserved id.' },
+      { id: 'speakers-lounge', text: 'Fictional: also not reserved.' },
+    ];
+    const res = await call('PUT', `/v1/events/${eventId}/draft`, {
+      token: owner,
+      body,
+      idempotencyKey: uuid(),
+    });
+    expect(res.status).toBe(200);
+  });
+});

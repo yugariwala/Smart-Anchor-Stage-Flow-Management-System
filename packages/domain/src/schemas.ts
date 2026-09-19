@@ -44,6 +44,35 @@ export const factSchema = z.object({
   text: z.string().min(1).max(FACT_MAX),
 });
 
+/**
+ * Fact IDs the SERVER owns. §12 reserves these prefixes so an organizer-entered fact cannot
+ * impersonate a source record: the event name and each approved speaker's display name are
+ * supplied to the model as server-created records with stable IDs such as `event:name` and
+ * `speaker:<uuid>:name`.
+ *
+ * SECURITY: without this, an organizer could submit a fact with id `event:name` and text of
+ * their choosing, and the model would receive it as though the server had vouched for it.
+ * `factSchema` still accepts reserved IDs because STORED state legitimately contains them;
+ * the rejection belongs at the REQUEST boundary, which is what `organizerFactSchema` is for.
+ */
+const RESERVED_FACT_ID = /^(?:event|speaker):/;
+
+export const isReservedFactId = (id: string): boolean => RESERVED_FACT_ID.test(id);
+
+/** A fact as supplied by an organizer. Reserved prefixes are refused here. */
+export const organizerFactSchema = factSchema.refine((f) => !isReservedFactId(f.id), {
+  message: 'fact ids beginning "event:" or "speaker:" are reserved for server-created records',
+  path: ['id'],
+});
+
+/** A speaker as supplied by an organizer: their facts may not use reserved ids either. */
+export const organizerSpeakerSchema = z.object({
+  id: idSchema,
+  displayName: z.string().min(1).max(NAME_MAX),
+  pronunciationHint: z.string().max(NAME_MAX),
+  facts: z.array(organizerFactSchema).max(10),
+});
+
 export const speakerSchema = z.object({
   id: idSchema,
   displayName: z.string().min(1).max(NAME_MAX),

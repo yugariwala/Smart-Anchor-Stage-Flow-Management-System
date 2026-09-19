@@ -12,30 +12,13 @@
   "currentCueId": "keynote",
   "activeForecastEndMin": 25,
   "scheduleHealth": "valid",
-  "eventFacts": [
-    {
-      "id": "event:name",
-      "text": "Sahyadri Institute TechFest 2026 \u2014 Inaugural Session"
-    },
-    {
-      "id": "event:venue",
-      "text": "Fictional venue: Kalpana Chawla Auditorium, Block C."
-    },
-    {
-      "id": "event:audience",
-      "text": "Approximately 300 fictional student attendees."
-    }
-  ],
+  "eventFacts": [],
   "speakers": [
     {
       "id": "spk-mehta",
       "displayName": "Dr. Ananya Mehta",
       "pronunciationHint": "uh-NAHN-yuh MEH-tah",
       "facts": [
-        {
-          "id": "speaker:spk-mehta:name",
-          "text": "Dr. Ananya Mehta"
-        },
         {
           "id": "fact-mehta-1",
           "text": "Fictional: heads the Applied Systems Lab at a fictional institute."
@@ -52,10 +35,6 @@
       "pronunciationHint": "VIK-ram RAO",
       "facts": [
         {
-          "id": "speaker:spk-rao:name",
-          "text": "Vikram Rao"
-        },
-        {
           "id": "fact-rao-1",
           "text": "Fictional: final-year student and TechFest community lead."
         }
@@ -66,10 +45,6 @@
       "displayName": "Priya Fernandes",
       "pronunciationHint": "PREE-yah fer-NAN-dez",
       "facts": [
-        {
-          "id": "speaker:spk-fernandes:name",
-          "text": "Priya Fernandes"
-        },
         {
           "id": "fact-fernandes-1",
           "text": "Fictional: represents the fictional sponsor Northwind Labs."

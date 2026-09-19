@@ -133,7 +133,9 @@ export const draftBody = (expectedRevision: number): Record<string, unknown> => 
       facts: [{ id: 'fact-1', text: 'Fictional: heads a fictional applied systems lab.' }],
     },
   ],
-  eventFacts: [{ id: 'event:name', text: 'TechFest 2026 Inaugural' }],
+  // Organizer facts use generated ids. `event:` and `speaker:` are reserved for
+  // server-created source records and are refused at this boundary (§12).
+  eventFacts: [{ id: 'fact-event-1', text: 'Fictional inaugural session.' }],
   cues: draftCues(),
 });
 

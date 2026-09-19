@@ -22,14 +22,14 @@ import {
   draftConfigSchema,
   draftCueInputSchema,
   eventStateSchema,
-  factSchema,
+  organizerFactSchema,
   materializeDraftCues,
   planIsValid,
   previewRepair,
   publishableCuesSchema,
   repairInputSchema,
   sameRepairOutcome,
-  speakerSchema,
+  organizerSpeakerSchema,
   startCue,
   TransitionError,
   validatePlan,
@@ -109,8 +109,9 @@ const createBodySchema = z.strictObject({
 const draftBodySchema = z.strictObject({
   expectedRevision: z.int().min(1),
   config: draftConfigSchema,
-  speakers: z.array(speakerSchema).max(20),
-  eventFacts: z.array(factSchema).max(10),
+  // Organizer-supplied, so reserved fact-id prefixes are refused here (§12).
+  speakers: z.array(organizerSpeakerSchema).max(20),
+  eventFacts: z.array(organizerFactSchema).max(10),
   cues: z.array(draftCueInputSchema).max(20),
 });
 
