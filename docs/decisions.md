@@ -1,0 +1,25 @@
+# Decisions
+
+Where `PS5-CuePilot-Master-Report.md` is silent, ambiguous, or underspecified, the ruling is
+recorded here so a later session does not re-litigate it. Each entry names the date it was
+settled. "Ours" means the contract is this team's invention, not the spec's.
+
+## 2026-09-19 — Milestone 1 rulings
+
+1. **`repairSchedule` signature.** `repairSchedule(state: EventState, input: RepairInput, nowMin: number): RepairResult`. §7A writes `repairSchedule(input)`, but `RepairInput` carries no cues, so the state must be passed. `nowMin` is minutes relative to `startsAt`, derived by the caller from `scenarioNowAt` in rehearsal or the server clock in live mode; negative values clamp to 0. The clock read belongs to the caller so the solver has zero clock dependency.
+2. **Fixture IDs vs UUIDs.** Cue and speaker IDs validate as nonempty bounded strings, not `.uuid()`, mirroring what §12 already mandates for `FactId`. UUID *generation* stays an API-layer concern at creation time. This keeps `qa` / `community` / `sponsor` legal so one fixture serves tests, video and deck. Noted in `packages/domain/src/schemas.ts`.
+3. **`validatePlan` signature.** `validatePlan(state, candidate: ScheduleInterval[], ctx: { activeForecastEndMin, nowMin }): ConstraintCheck[]`, plus `planIsValid(checks)`. Marked `// INVENTED: not specified in §12` in the source. It shares no code with `repair.ts` — duplicated arithmetic is the point, since a shared helper would let one bug pass both checks.
+4. **Cursor past `hardEndMin` with pending cues.** The cursor is validated against the hard end only in the no-pending-cues branch. When every DP transition fails, the all-minimum pass reports the blocking rule.
+5. **`failure.cueId` for `hard_end` is `null`.** The overrun belongs to the plan, not one cue. §12 already types the field `UUID | null`, so this is consistent, not an extension.
+6. **`constraintChecks` containment.** `minimum_durations`, `fixed_start` (per cue that has one) and `hard_end` are **always** emitted on a feasible result, so §12's example payload stays a valid instance of real output. Beyond those three, `buffer`, `not_before` and `contiguous_order` are emitted where applicable, and tests assert containment rather than array equality.
+7. **Interior tie-break is not pinned.** §7A fixes the DP's output deterministically (previous ends ascending, durations descending, replace only on strictly lower cost, final layer minimum cost then earliest finish) but names no rule to choose between two optima sharing both cost and finish minute. Brute-force asserts `(feasible, weightedShorteningCost, projectedFinishMin)` on every case and the full per-cue schedule only where the optimum is provably unique. All three fixture cases are unique optima, so their full schedules *are* asserted.
+8. **`recoveredMin` baseline.** Summed published pending durations (`plannedEndMin - plannedStartMin`) minus summed new durations — not start-time shifts, not the entered delay. Gives exactly 12 on the +12 scenario. A **negative** value is *restored time* and must never be described as recovered delay; asserted by test.
+9. **Dev-build rejection diagnostics.** `RejectionReason` is a union of `fixed_start_unreachable`, `hard_end_exceeded`, `not_strictly_lower_cost`. `repairScheduleWithDiagnostics` returns per-reason counts; `repairSchedule` delegates to it and drops them, so the §12 `RepairResult` shape is not polluted and the approved signature is unchanged.
+
+## 2026-09-19 — incidental
+
+- **`baseRevision` comes from `state.revision`**, not `input.expectedRevision`. The API compares the two and rejects a mismatch before calling the solver, so the result reports what was actually solved against.
+- **`GET /v1/whoami` is not in §12's endpoint inventory.** It is an M0-only auth probe and is labelled as such rather than presented as part of the contract.
+- **`lib: ["ES2022", "DOM"]`** in `tsconfig.base.json`, because the 128 KB state-body check needs `TextEncoder` for real UTF-8 byte length (`.length` would undercount Hindi and Gujarati). `@types/node` is deliberately *not* installed for `packages/domain` — the fixture is imported via `resolveJsonModule` so Node APIs cannot leak into a package that must also run on Workers and in the browser.
+- **Brute-force corpus is generated relative to the schedule, not absolutely.** A naive generator (random absolute `hardEndMin` and `fixedStartMin`) produced 80 cases of which only 6 had a non-zero optimal cost, making the objective comparison nearly vacuous. The horizon is now drawn from `[allMinimumFinish - 2, allPreferredFinish + 2]` and rule offsets are relative to where each cue lands. Seed `0x5c0eb17a`: 80 cases, 36 feasible, 44 infeasible, 25 requiring real compression, 32 with a unique optimum. `bruteforce.test.ts` asserts these proportions so the corpus cannot silently degenerate again.
+- **`renderOperationalCue` throws `not implemented: Milestone 2`**, not Milestone 1. M0's prompt labelled it Milestone 1, but M1's scope was explicitly the solver only.
