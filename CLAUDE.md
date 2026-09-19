@@ -61,27 +61,36 @@ deletion, no live drag-and-drop.
 | # | Scope | Status |
 |---|---|---|
 | M0a | Monorepo substrate: npm workspaces, strict TS, Vitest, `packages/domain` skeleton | **done** |
-| M0b | Worker (`apps/api`), `EventRoom`/`QuotaRoom`, Firebase token verification, `apps/web` sign-in page, Gemini adapter + smoke script, `.env.example`, deploy scripts | **blocked on credentials** — needs the Firebase project, `firebase login`, `wrangler login`, a Gemini API key and `wrangler secret put GEMINI_API_KEY` |
+| M0b | `apps/web` anonymous sign-in page, Gemini adapter + smoke script, `.env.example`, hosting deploy | **partly blocked** — the Worker half landed in M2; the web page needs `VITE_FIREBASE_*`, the Gemini adapter needs `wrangler secret put GEMINI_API_KEY` (M4) |
 | M1 | Deterministic repair solver, independent `validatePlan`, fixture, brute-force test suite | **done** |
-| M2 | `renderOperationalCue`, draft validation and canonical state transitions, publish | not started |
-| M3 | Repair proposals, approval, atomic publication, command ledger, revisions | not started |
+| M2 | Worker router, `EventRoom`/`QuotaRoom` SQLite DOs, Firebase token verification, create/draft/publish/published-poll/invitations/join/ack/revisions/delete, 72h expiry | **done** |
+| M3 | `renderOperationalCue`, repair proposals wired to the solver, approval, cue start/complete, rehearsal clock | not started |
 | M4 | Gemini script proposals, structured validation, quota lease, template fallback | not started |
-| M5 | Invitations, anchor role, acknowledgment, announcements, rehearsal clock | not started |
-| M6 | Expiry/deletion, sanitized logging, offline snapshot, printable runbook | not started |
+| M5 | Announcements and dismissal, the `college-demo-v1` draft seed, "Load rehearsal at keynote" | not started |
+| M6 | Offline snapshot cache, countdown offset, printable runbook, accessibility and localisation pass | not started |
 
-`renderOperationalCue` currently throws `not implemented: Milestone 2` — M1's scope was the
-solver only, so it moved out of M0's original numbering.
+Invitations, the anchor role, acknowledgment, 72-hour expiry, deletion and sanitized logging
+landed in M2 rather than M5/M6, because the publication path needed a second identity and a
+retention story to be testable at all.
+
+`renderOperationalCue` throws `not implemented: Milestone 2` — M1's scope was the solver
+only, so it moved out of M0's original numbering. It is M3 work now.
 
 ## Commands
 
 ```bash
 npm ci            # install from the committed lockfile
 npm run typecheck # tsc --noEmit in every workspace
-npm test          # vitest run
+npm test          # vitest run: domain on the node pool, API in real workerd
+npm run dev:api   # wrangler dev on http://127.0.0.1:8787
 ```
 
 Scripts named in §24 but not yet created, because the workspaces they drive do not exist:
-`dev`, `dev:web`, `dev:api`, `test:e2e`, `build`, `deploy:api`, `deploy:web`.
+`dev`, `dev:web`, `test:e2e`, `build`, `deploy:web`.
+
+`apps/api/.dev.vars` is required for `wrangler dev` and is gitignored; copy
+`apps/api/.dev.vars.example` and fill it in. `GEMINI_API_KEY` is a Worker secret, set with
+`npx wrangler secret put GEMINI_API_KEY`, and must never appear in a file.
 
 To see a solver result by hand, the three fixture scenarios are asserted in
 `packages/domain/test/repair.test.ts`: +12 (feasible, cost 24), +8 (feasible, cost 12),

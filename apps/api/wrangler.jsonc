@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "cuepilot-api",
   "main": "src/index.ts",
-  "compatibility_date": "2026-09-19",
+  "compatibility_date": "2026-08-22",
 
   // Public, non-secret configuration. GEMINI_API_KEY is a Worker SECRET and is set with
   //   npx wrangler secret put GEMINI_API_KEY
