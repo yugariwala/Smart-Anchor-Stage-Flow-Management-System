@@ -10,7 +10,10 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev:api": "npm run dev -w @cuepilot/api"
+    "dev:api": "npm run dev -w @cuepilot/api",
+    "dev:web": "npm run dev -w @cuepilot/web",
+    "build": "npm run build --workspaces --if-present",
+    "deploy:api": "npm run deploy -w @cuepilot/api"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
