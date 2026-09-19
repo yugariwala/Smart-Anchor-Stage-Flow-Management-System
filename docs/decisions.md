@@ -172,3 +172,83 @@ fixture's own main path. Both are implemented and both have a test.
 - **`VITE_FIREBASE_*` is public client configuration** and ships in the browser bundle by
   design. `apps/web/.env.local` is gitignored anyway (per-developer, and the credential rules
   above still apply to the file it came from).
+
+## 2026-09-19 - Milestone 4 rulings
+
+1. **The `no-computing-a-schedule` rule is mechanical, not a convention.** `apps/web` runs
+   oxlint with `no-restricted-imports`: it may import types and `renderOperationalCue`, never
+   `repairSchedule`, `previewRepair`, `applyRepair`, `validatePlan`, `computeInitialIntervals`,
+   `materializeDraftCues`, the transitions, or `zod` directly. Demonstrated failing once and
+   restored. `npm run lint` is part of `npm run check`.
+2. **Acknowledgements get a separate 10 s console-only poll.** They are auxiliary records and
+   never bump the revision (§12), so revision-driven polling can never surface them - yet §14
+   requires the console to show them. The cheaper-looking alternative, putting an ack marker
+   in the published snapshot, was rejected: every acknowledgement would then invalidate every
+   anchor's cached snapshot, turning a private bookkeeping event into a fan-out.
+3. **Hash routing, invite secret as a fragment query param.** `#/join/{id}?code=...`. The
+   fragment never reaches the server or a log, and `history.replaceState` strips only `code`.
+   Avoids Hosting rewrites entirely.
+4. **The countdown is `aria-hidden`; a separate `aria-live="polite"` region announces only
+   revision changes.** §20 wants a polite announcement on a new revision and explicitly not a
+   per-second timer.
+5. **The poll hook owns the clock.** `nowMs` is state advanced by a one-second ticker, so no
+   component calls `Date.now()` during render. A component that did would be impure and could
+   render a different countdown on every re-render.
+6. **`useCommand` holds the idempotency key per INTENT.** A transport failure sets status
+   `unknown`, distinct from `failed`, and KEEPS the key so a retry replays rather than
+   double-applies (§17: never retry an uncertain publication with a new key).
+7. **Two beats of §25 are unshootable and that is recorded, not worked around.** See
+   `docs/demo-script.md`. A hardcoded "AI" response is explicitly not a substitute (§21).
+
+## 2026-09-19 - Milestone 4: two bugs the live run found
+
+Neither was visible from the test suite; both needed a real browser.
+
+1. **Anonymous sign-in minted a NEW identity on every page load**, orphaning the organizer's
+   event on a plain refresh. Two causes, both fixed in `apps/web/src/lib/auth.ts`:
+   - `auth.currentUser` is `null` immediately after `getAuth()` even when a session IS
+     persisted, because Firebase restores it asynchronously. Finding `null` means "not
+     restored yet", not "no user". The fix awaits `auth.authStateReady()` first.
+   - React StrictMode double-invokes mount effects, so two concurrent callers both passed the
+     check and both called `signInAnonymously`. The in-flight promise is now shared.
+
+   Symptom that exposed it: the console displayed one uid while requests were being made by
+   another, which briefly looked like an authorization bypass. It was not - a fresh third
+   identity was verified to receive `404` on both `GET /events/{id}` and `GET /published`, so
+   membership enforcement was correct throughout. Verified after the fix: the uid is now
+   stable across reloads.
+
+2. **The contrast script itself was wrong before the colours were.** The first run reported
+   10 of 23 pairs failing, including a ratio of 23.10:1 - impossible, since 21:1 is the
+   maximum. The blue channel was being fed raw 0-255 into the luminance sum instead of through
+   the sRGB linearisation. After the fix all 23 pairs pass, and a hand-computed check
+   (`#6b4708` on `#fdf0d5` = 7.35) matches the script. A measurement that cannot be sanity
+   checked is not a measurement.
+
+## 2026-09-19 - Milestone 4: measured contrast
+
+`node apps/web/scripts/contrast.mjs` reads the custom properties straight out of
+`src/styles.css` and computes WCAG 2.2 ratios. All 23 foreground/background pairs pass, with
+the tightest margins being:
+
+| Pair | Ratio | Needs |
+|---|---|---|
+| Control border on card (UI component) | 4.43:1 | 3:1 |
+| Rehearsal banner text | 7.35:1 | 4.5:1 |
+| Status chip: ok | 7.55:1 | 4.5:1 |
+| Anchor muted text on surface | 9.04:1 | 4.5:1 |
+
+Contrast is a measurement here, not a claim. No formal accessibility certification is implied
+(§20 is explicit about that).
+
+## 2026-09-19 - Milestone 4: local environment notes
+
+- **Vite may not get port 5173.** Another project already held it, so Vite fell back to 5174
+  and every API call would have failed CORS. `ALLOWED_ORIGINS` in `apps/api/.dev.vars` now
+  lists 5173 and 5174 on both `localhost` and `127.0.0.1`. Check the Vite banner for the
+  actual port before blaming the API.
+- **Do not launch `wrangler dev` repeatedly in the background.** Each launch leaves a
+  supervisor process that respawns `workerd` when its child is killed; six accumulated
+  stacks fought over port 8787. To clean up, kill the supervisor PARENTS first (the
+  `node --no-warnings .../apps/api/...` processes, which are the parents of the `workerd.exe`
+  processes), then the children. Killing `workerd.exe` alone just triggers a respawn.
