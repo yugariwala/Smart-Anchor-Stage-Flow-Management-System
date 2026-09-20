@@ -172,6 +172,12 @@ with `npx wrangler secret put GEMINI_API_KEY`, and must never be committed. Voic
 off by default. Enabling them also requires the three Worker secrets documented in
 `apps/api/.dev.vars.example`; no provider credential belongs in a repository file.
 
+Both `AI_ENABLED` and `VOICE_REMINDERS_ENABLED` default to `false` in development and production.
+This prevents Gemini and Twilio requests even when their secrets exist. Enable either integration
+only after deliberately reviewing that provider's billing plan and usage limits. With AI disabled,
+host-script drafting continues through the labelled deterministic template fallback.
+GitHub Actions is also manual-only, so a push or pull request cannot consume runner minutes.
+
 ## Commands
 
 ```bash
