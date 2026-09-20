@@ -16,14 +16,34 @@ import type { Route } from "../lib/route";
 import { localeNames, locales, useI18n, type UiLocale } from "../lib/i18n";
 import { Modal } from "./UI";
 
+/*
+  Grouped by when a link is actually useful. Flat and eight deep, half of them dead ends
+  until the runbook is published, it read as "eight things you must do now". The Shell has
+  no publication state to disable them with, so it orders them instead.
+*/
 const eventNav = [
-  ["console", "Stage console", DashboardIcon],
-  ["setup", "Event setup", CalendarIcon],
-  ["speakers", "Speakers & facts", PersonIcon],
-  ["scripts", "Host scripts", ReaderIcon],
-  ["announcements", "Announcements", SpeakerLoudIcon],
-  ["history", "Revision history", CounterClockwiseClockIcon],
-  ["settings", "Event settings", GearIcon],
+  {
+    group: "Prepare",
+    items: [
+      ["setup", "Event setup", CalendarIcon],
+      ["speakers", "Speakers & facts", PersonIcon],
+    ],
+  },
+  {
+    group: "Run the show",
+    items: [
+      ["console", "Stage console", DashboardIcon],
+      ["scripts", "Host scripts", ReaderIcon],
+      ["announcements", "Announcements", SpeakerLoudIcon],
+    ],
+  },
+  {
+    group: "Afterwards",
+    items: [
+      ["history", "Revision history", CounterClockwiseClockIcon],
+      ["settings", "Event settings", GearIcon],
+    ],
+  },
 ] as const;
 export function Shell({
   route,
@@ -45,7 +65,10 @@ export function Shell({
     "eventId" in route && route.kind !== "join" && route.kind !== "anchor"
       ? route.eventId
       : null;
-  const navItem = eventNav.find((item) => item[0] === route.kind);
+  // The nav is grouped now, so the page-title lookup searches each group in turn.
+  const navItem = eventNav
+    .map((section) => section.items.find((item) => item[0] === route.kind))
+    .find((item) => item !== undefined);
   const currentPage = navItem
     ? t(navItem[1])
     : route.kind === "landing"
@@ -69,22 +92,28 @@ export function Shell({
       </a>
       {eventId && (
         <>
-          <p className="nav-label">{t("Event workspace")}</p>
-          {eventNav.map(([key, label, Icon]) => (
-            <a
-              key={key}
-              href={`#/event/${eventId}/${key}`}
-              className={`nav-link ${route.kind === key ? "selected" : ""}`}
-              aria-current={route.kind === key ? "page" : undefined}
-            >
-              <Icon />
-              {t(label)}
-            </a>
+          {eventNav.map(({ group, items }) => (
+            <div key={group}>
+              <p className="nav-label">{t(group)}</p>
+              {items.map(([key, label, Icon]) => (
+                <a
+                  key={key}
+                  href={`#/event/${eventId}/${key}`}
+                  className={`nav-link ${route.kind === key ? "selected" : ""}`}
+                  aria-current={route.kind === key ? "page" : undefined}
+                >
+                  <Icon />
+                  {t(label)}
+                </a>
+              ))}
+              {group === "Run the show" ? (
+                <a className="nav-link" href={`#/anchor/${eventId}`}>
+                  <ArrowTopRightIcon />
+                  {t("Anchor view")}
+                </a>
+              ) : null}
+            </div>
           ))}
-          <a className="nav-link" href={`#/anchor/${eventId}`}>
-            <ArrowTopRightIcon />
-            {t("Anchor view")}
-          </a>
         </>
       )}
       <div className="nav-bottom">
@@ -179,9 +208,6 @@ export function Shell({
                 </option>
               ))}
             </select>
-            <span className="small muted">
-              {t("Single-stage event control")}
-            </span>
             <a href="#/help" className="icon-button" aria-label={t("Help")}>
               <QuestionMarkCircledIcon />
             </a>

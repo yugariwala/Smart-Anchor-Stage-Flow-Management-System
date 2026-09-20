@@ -120,23 +120,20 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
           <h2>{state.name}</h2>
         </div>
         <div className="row no-print">
-          <button
-            className="icon-button"
-            onClick={poll.refresh}
-            aria-label={t("Refresh runbook")}
-          >
+          {/*
+            Labelled, not icon-only: an anchor backstage will not guess what the middle
+            glyph does, and the accessible name now matches what is on screen.
+          */}
+          <button className="labelled-icon" onClick={poll.refresh}>
             <ReloadIcon />
+            {t("Refresh")}
           </button>
-          <button
-            className="icon-button"
-            onClick={() => window.print()}
-            aria-label={t("Print runbook")}
-          >
+          <button className="labelled-icon" onClick={() => window.print()}>
             <FileTextIcon />
+            {t("Print")}
           </button>
           <button
-            className="icon-button"
-            aria-label={t("Toggle fullscreen")}
+            className="labelled-icon"
             onClick={() => {
               const action = document.fullscreenElement
                 ? document.exitFullscreen()
@@ -149,6 +146,7 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
             }}
           >
             <EnterFullScreenIcon />
+            {t("Full screen")}
           </button>
         </div>
       </header>
@@ -188,8 +186,8 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
       <StageOverview
         state={state}
         nowAt={nowAt}
-        revision={snapshot.publishedRevision}
         freshness={poll.freshness}
+        lastSyncAt={poll.lastSyncAt}
         stage
       />
       <ReadinessReminder
@@ -265,10 +263,10 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
           {ackPending
             ? t("Acknowledging…")
             : ackedRevision === snapshot.publishedRevision
-              ? t("Acknowledged revision {revision}", {
+              ? t("Got it — version {revision}", {
                   revision: snapshot.publishedRevision,
                 })
-              : t("Acknowledge revision {revision}", {
+              : t("I’ve got the update (version {revision})", {
                   revision: snapshot.publishedRevision,
                 })}
         </button>
@@ -288,7 +286,7 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
 
       <p className="muted small">
         {t(
-          "Acknowledgement confirms you received this revision. It does not confirm the words have been spoken.",
+          "Confirming means you received this update. It does not confirm the words have been spoken.",
         )}
       </p>
       <section className="anchor-now runbook-full">

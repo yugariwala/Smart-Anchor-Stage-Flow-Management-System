@@ -125,8 +125,35 @@ export function App() {
     );
   if (loading)
     return (
+      /*
+        Anonymous sign-in costs a network round trip — measured at ~3.7 s cold on the
+        deployed app. It cannot be skipped, but it does not have to be blank: a
+        first-time visitor was previously shown three grey boxes and the words
+        "Restoring your secure session", which is doubly wrong for someone who has
+        never had one. The wait now carries the landing page's own explanation.
+      */
       <div className="auth-page">
-        <Loading label={t("Restoring your secure session")} />
+        <div className="auth-card">
+          <span className="brand">CuePilot</span>
+          <h1>{t("Keep the show moving together.")}</h1>
+          <p className="muted">
+            {t(
+              "Prepare your rundown, protect your timing, and keep your anchor on the same page.",
+            )}
+          </p>
+          <ol className="small muted intro-steps">
+            <li>
+              <strong>{t("Prepare")}</strong> — {t("Every cue in its place")}
+            </li>
+            <li>
+              <strong>{t("Publish")}</strong> — {t("One approved runbook")}
+            </li>
+            <li>
+              <strong>{t("Perform")}</strong> — {t("Everyone on the same cue")}
+            </li>
+          </ol>
+          <Loading label={t("Setting up your workspace")} />
+        </div>
       </div>
     );
   if (!uid)

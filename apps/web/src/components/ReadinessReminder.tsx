@@ -73,7 +73,7 @@ export function ReadinessReminder({
             className="text-button"
             onClick={() => setDismissed(reminderId)}
           >
-            {t("Dismiss on this screen")}
+            {t("Hide this")}
           </button>
         </div>
       </div>

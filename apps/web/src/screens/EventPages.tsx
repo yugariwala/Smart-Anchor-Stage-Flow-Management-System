@@ -348,6 +348,13 @@ function Scripts({
         <CommandNotice
           status={command.status}
           message={command.message}
+          {...(draft === null
+            ? {
+                okMessage: t(
+                  "Script published. Your anchor's runbook now carries these words.",
+                ),
+              }
+            : {})}
           retry={() =>
             void command
               .retry<ScriptDraftResponse | { scriptId: string }>()
@@ -595,6 +602,9 @@ function Announcements({
         <CommandNotice
           status={command.status}
           message={command.message}
+          okMessage={t(
+            "Announcement published. It is on your anchor's screen now.",
+          )}
           retry={() =>
             void command.retry<{ announcementId?: string }>().then((result) => {
               if (result) {
@@ -882,7 +892,7 @@ export function RunbookTable({ state }: { state: EventState }) {
       <table>
         <thead>
           <tr>
-            <th scope="col">{t("Cue")}</th>
+            <th scope="col">{t("Session")}</th>
             <th scope="col">{t("Time (IST)")}</th>
             <th scope="col">{t("Speaker")}</th>
             <th scope="col">{t("Status")}</th>

@@ -249,24 +249,54 @@ export function Landing({ uid }: { uid: string }) {
             >
               <Link2Icon /> {t("Join an event")}
             </button>
-            <button
-              disabled={busy}
-              onClick={() => {
-                setDemoOpen(true);
-                setFormError("");
-              }}
-            >
-              <MagicWandIcon /> {t("Try fictional rehearsal")}
-            </button>
-            <Button
-              size="3"
-              onClick={() => {
-                setCreateOpen(true);
-                setFormError("");
-              }}
-            >
-              <PlusIcon /> {t("Create event")}
-            </Button>
+            {/*
+              With nothing in the workspace there is nothing to create FROM yet, and
+              the seeded rehearsal is the fastest way for a first-time visitor — or a
+              judge — to see the product work. It leads only while the list is empty.
+            */}
+            {events.length === 0 ? (
+              <>
+                <button
+                  onClick={() => {
+                    setCreateOpen(true);
+                    setFormError("");
+                  }}
+                >
+                  <PlusIcon /> {t("Create event")}
+                </button>
+                <Button
+                  size="3"
+                  disabled={busy}
+                  onClick={() => {
+                    setDemoOpen(true);
+                    setFormError("");
+                  }}
+                >
+                  <MagicWandIcon /> {t("Try fictional rehearsal")}
+                </Button>
+              </>
+            ) : (
+              <>
+                <button
+                  disabled={busy}
+                  onClick={() => {
+                    setDemoOpen(true);
+                    setFormError("");
+                  }}
+                >
+                  <MagicWandIcon /> {t("Try fictional rehearsal")}
+                </button>
+                <Button
+                  size="3"
+                  onClick={() => {
+                    setCreateOpen(true);
+                    setFormError("");
+                  }}
+                >
+                  <PlusIcon /> {t("Create event")}
+                </Button>
+              </>
+            )}
           </>
         }
       />
@@ -390,8 +420,12 @@ export function Landing({ uid }: { uid: string }) {
                   {t("Clear filters")}
                 </button>
               ) : (
-                <Button onClick={() => setCreateOpen(true)}>
-                  <PlusIcon /> {t("Create event")}
+                /*
+                  One obvious button. The header already offers the rehearsal and the
+                  join link, so a second filled `Create event` split the decision in two.
+                */
+                <Button size="3" onClick={() => setCreateOpen(true)}>
+                  <PlusIcon /> {t("Create your first event")}
                 </Button>
               )
             }
@@ -520,7 +554,7 @@ export function Landing({ uid }: { uid: string }) {
       )}
       <p className="footnote">
         {t(
-          "Browser-local workspace · Anonymous identity · Events expire after 72 hours",
+          "Saved in this browser · no account needed · events expire after 72 hours",
         )}
       </p>
       <Modal

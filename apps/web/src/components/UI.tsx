@@ -148,13 +148,23 @@ export function Modal({
 export function CommandNotice({
   status,
   message,
+  okMessage,
   retry,
 }: {
   status: string;
   message: string;
+  /** Shown on success, so every screen confirms a mutation the same way. */
+  okMessage?: string;
   retry?: () => void;
 }) {
   const { t } = useI18n();
+  if (!message && status === "ok" && okMessage) {
+    return (
+      <div className="notice notice-ok" role="status">
+        <p>{okMessage}</p>
+      </div>
+    );
+  }
   if (!message) return null;
   return (
     <div

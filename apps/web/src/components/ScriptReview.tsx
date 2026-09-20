@@ -219,7 +219,7 @@ export function ScriptReview({
           }
           onClick={() => onApprove(body, draft.usedFactIds)}
         >
-          {busy ? t("Approving…") : t("Approve and publish copy")}
+          {busy ? t("Publishing…") : t("Publish this script")}
         </button>
         <button type="button" onClick={onDiscard} disabled={busy}>
           {t("Discard draft")}

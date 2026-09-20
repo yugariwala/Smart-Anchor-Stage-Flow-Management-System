@@ -25,7 +25,7 @@ export function FreshnessChip({
   const { t } = useI18n();
   const label =
     freshness === "live"
-      ? t("Live")
+      ? t("Up to date")
       : freshness === "amber"
         ? t("Syncing")
         : t("Updates paused");
@@ -38,7 +38,7 @@ export function FreshnessChip({
   return (
     <span className={`chip ${cls}`}>
       {label}
-      {revision === null ? "" : ` · ${t("revision")} ${revision}`}
+      {revision === null ? "" : ` · ${t("version")} ${revision}`}
     </span>
   );
 }
