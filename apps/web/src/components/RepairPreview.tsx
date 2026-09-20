@@ -197,7 +197,7 @@ export function RepairPreviewPanel({
             <p>
               {t(
                 "Of every arrangement that keeps all your fixed commitments, this one loses the least. Its shortening score is {score} — lower is better, and items you marked as more protected count for more.",
-                { score: result.weightedShorteningCost },
+                { score: result.weightedShorteningCost ?? "—" },
               )}
             </p>
           </details>

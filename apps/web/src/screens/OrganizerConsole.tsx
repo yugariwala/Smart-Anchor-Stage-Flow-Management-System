@@ -459,7 +459,7 @@ export function OrganizerConsole({
         <StageOverview
           state={state}
           nowAt={state.scenarioNowAt ?? poll.serverNowIso}
-          revision={envelope?.publishedRevision ?? null}
+          lastSyncAt={envelope?.publishedRevision ?? null}
           freshness={poll.freshness}
         />
         {envelope?.publishedRevision !== null && (
