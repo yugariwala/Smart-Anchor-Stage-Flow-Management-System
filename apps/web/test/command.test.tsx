@@ -76,7 +76,7 @@ describe("confirmed and unknown command outcomes", () => {
       });
     });
     expect(result.current.status).toBe("failed");
-    expect(result.current.message).toContain("revision 8");
+    expect(result.current.message).toContain("version 8");
     await act(async () => {
       await result.current.run("updated", async () => true);
     });

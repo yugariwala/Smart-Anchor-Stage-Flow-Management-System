@@ -78,21 +78,21 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
     csvDialog.getByRole("region", { name: "Import preview" }),
   ).toContainText("Imported welcome");
   await csvDialog
-    .getByRole("button", { name: "Add 1 cue", exact: true })
+    .getByRole("button", { name: "Add 1 item", exact: true })
     .click();
-  await expect(page.getByLabel("Cue title")).toHaveCount(1);
-  await expect(page.getByLabel("Cue title")).toHaveValue("Imported welcome");
+  await expect(page.getByLabel("Session name")).toHaveCount(1);
+  await expect(page.getByLabel("Session name")).toHaveValue("Imported welcome");
   await page
     .getByRole("button", { name: "Event details", exact: true })
     .click();
   await page
-    .getByRole("button", { name: "Load scenario", exact: true })
+    .getByRole("button", { name: "Load the demo event", exact: true })
     .click();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: "Load scenario", exact: true })
+    .getByRole("button", { name: "Load the demo event", exact: true })
     .click();
-  await expect(page.getByLabel("Cue title")).toHaveCount(6);
+  await expect(page.getByLabel("Session name")).toHaveCount(6);
   await page.getByRole("button", { name: "Save & review" }).click();
   await expect(
     page.getByRole("heading", {
@@ -101,11 +101,11 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
     }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Validate and publish", exact: true })
+    .getByRole("button", { name: "Check and publish", exact: true })
     .click();
   await page
     .getByRole("dialog", { name: "Publish the runbook?" })
-    .getByRole("button", { name: "Validate and publish", exact: true })
+    .getByRole("button", { name: "Check and publish", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Start Opening remarks", exact: true }),
@@ -130,7 +130,7 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   const anchor = await anchorContext.newPage();
   await anchor.goto(invitation);
   await expect(
-    anchor.getByRole("button", { name: /Acknowledge revision/ }),
+    anchor.getByRole("button", { name: /I’ve got the update/ }),
   ).toBeEnabled();
   expect(anchor.url()).not.toContain("code=");
   await inviteDialog.getByRole("button", { name: "Close dialog" }).click();
@@ -173,37 +173,35 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
     name: "Upcoming cue reminder",
   });
   await expect(reminder).toBeVisible();
-  await reminder
-    .getByRole("button", { name: "Dismiss on this screen" })
-    .click();
+  await reminder.getByRole("button", { name: "Hide this" }).click();
   await expect(reminder).not.toBeVisible();
-  await page.getByLabel("Delay in minutes").fill("19");
+  await page.getByLabel("Minutes late").fill("19");
   await page
     .getByRole("button", { name: "Preview recovery plan", exact: true })
     .click();
-  const repair = page.getByRole("dialog", { name: "Review the recovery plan" });
+  const repair = page.getByRole("dialog", { name: "Recovery plan" });
   await expect(repair.getByText(/short by 7 minutes/)).toBeVisible();
   await expect(
-    repair.getByRole("button", { name: "Approve and publish" }),
+    repair.getByRole("button", { name: "Publish this plan" }),
   ).toBeDisabled();
-  await repair.getByRole("button", { name: "Discard preview" }).click();
-  await page.getByLabel("Delay in minutes").fill("12");
+  await repair.getByRole("button", { name: "Cancel" }).click();
+  await page.getByLabel("Minutes late").fill("12");
   await page
     .getByRole("button", { name: "Preview recovery plan", exact: true })
     .click();
   await expect(
-    repair.getByRole("button", { name: "Approve and publish" }),
+    repair.getByRole("button", { name: "Publish this plan" }),
   ).toBeEnabled();
   await page.screenshot({
     path: "apps/web/test-results/repair-desktop.png",
     fullPage: true,
   });
-  await repair.getByRole("button", { name: "Approve and publish" }).click();
+  await repair.getByRole("button", { name: "Publish this plan" }).click();
   await expect(repair).not.toBeVisible();
   await expect(anchor.getByText(/until 10:37/)).toBeVisible();
-  await anchor.getByRole("button", { name: /Acknowledge revision/ }).click();
+  await anchor.getByRole("button", { name: /I’ve got the update/ }).click();
   await expect(
-    anchor.getByRole("button", { name: /Acknowledged revision/ }),
+    anchor.getByRole("button", { name: /Got it — version/ }),
   ).toBeDisabled();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
@@ -235,7 +233,7 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
     page.getByRole("heading", { name: "Review draft", exact: true }),
   ).toBeVisible({ timeout: 45_000 });
   const approveCopy = page.getByRole("button", {
-    name: "Approve and publish copy",
+    name: "Publish this script",
     exact: true,
   });
   await expect(approveCopy).toBeDisabled();
@@ -262,9 +260,9 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   await expect(
     anchor.getByText(announcement, { exact: true }),
   ).not.toBeVisible();
-  await anchor.getByRole("button", { name: /Acknowledge revision/ }).click();
+  await anchor.getByRole("button", { name: /I’ve got the update/ }).click();
   await expect(
-    anchor.getByRole("button", { name: /Acknowledged revision/ }),
+    anchor.getByRole("button", { name: /Got it — version/ }),
   ).toBeDisabled();
 
   for (const [route, title] of [
@@ -350,10 +348,10 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
     timeout: 25_000,
   });
   await expect(
-    anchor.getByRole("button", { name: /Acknowledged revision/ }),
+    anchor.getByRole("button", { name: /Got it — version/ }),
   ).toBeDisabled();
   await anchorContext.setOffline(false);
-  await anchor.getByRole("button", { name: "Refresh runbook" }).click();
+  await anchor.getByRole("button", { name: "Refresh" }).click();
   await expect(anchor.getByText(/Offline snapshot/)).not.toBeVisible();
   await anchor.emulateMedia({ media: "print" });
   await expect(
@@ -362,9 +360,7 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   await expect(
     anchor.getByRole("heading", { name: "Speaker pronunciation & facts" }),
   ).toBeVisible();
-  await expect(
-    anchor.getByRole("button", { name: "Refresh runbook" }),
-  ).toBeHidden();
+  await expect(anchor.getByRole("button", { name: "Refresh" })).toBeHidden();
   const printPdf = await anchor.pdf({
     path: "apps/web/test-results/anchor-runbook-print.pdf",
     format: "A4",
@@ -381,7 +377,7 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
     page.getByRole("heading", { name: "Your events", exact: true }),
   ).toBeVisible();
   await anchor.emulateMedia({ media: "screen" });
-  await anchor.getByRole("button", { name: "Refresh runbook" }).click();
+  await anchor.getByRole("button", { name: "Refresh" }).click();
   await expect(
     anchor.getByText(/This event is not available to you/),
   ).toBeVisible();

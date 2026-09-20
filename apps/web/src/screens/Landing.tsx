@@ -109,9 +109,7 @@ export function Landing({ uid }: { uid: string }) {
       rememberEvent(result.state, "owner");
       // A seeded event already has an agenda; its next labeled step is on the console.
       const seeded = result.state.demoSeed === "college-demo-v1";
-      navigate(
-        `#/event/${result.state.id}/${seeded ? "console" : "setup"}`,
-      );
+      navigate(`#/event/${result.state.id}/${seeded ? "console" : "setup"}`);
     }
   };
   const createDemo = async (): Promise<void> => {
@@ -243,24 +241,54 @@ export function Landing({ uid }: { uid: string }) {
             >
               <Link2Icon /> Join an event
             </button>
-            <button
-              disabled={busy}
-              onClick={() => {
-                setDemoOpen(true);
-                setFormError("");
-              }}
-            >
-              <MagicWandIcon /> Try fictional rehearsal
-            </button>
-            <Button
-              size="3"
-              onClick={() => {
-                setCreateOpen(true);
-                setFormError("");
-              }}
-            >
-              <PlusIcon /> Create event
-            </Button>
+            {/*
+              With nothing in the workspace there is nothing to create FROM yet, and the
+              seeded rehearsal is the fastest way for a first-time visitor — or a judge —
+              to see the product actually work. It leads only while the list is empty.
+            */}
+            {events.length === 0 ? (
+              <>
+                <button
+                  onClick={() => {
+                    setCreateOpen(true);
+                    setFormError("");
+                  }}
+                >
+                  <PlusIcon /> Create event
+                </button>
+                <Button
+                  size="3"
+                  disabled={busy}
+                  onClick={() => {
+                    setDemoOpen(true);
+                    setFormError("");
+                  }}
+                >
+                  <MagicWandIcon /> Try fictional rehearsal
+                </Button>
+              </>
+            ) : (
+              <>
+                <button
+                  disabled={busy}
+                  onClick={() => {
+                    setDemoOpen(true);
+                    setFormError("");
+                  }}
+                >
+                  <MagicWandIcon /> Try fictional rehearsal
+                </button>
+                <Button
+                  size="3"
+                  onClick={() => {
+                    setCreateOpen(true);
+                    setFormError("");
+                  }}
+                >
+                  <PlusIcon /> Create event
+                </Button>
+              </>
+            )}
           </>
         }
       />
@@ -382,8 +410,13 @@ export function Landing({ uid }: { uid: string }) {
                   Clear filters
                 </button>
               ) : (
-                <Button onClick={() => setCreateOpen(true)}>
-                  <PlusIcon /> Create event
+                /*
+                  One obvious button. The header already offers the rehearsal and the
+                  join link, so a second filled `Create event` here just split the
+                  first-run decision in two.
+                */
+                <Button size="3" onClick={() => setCreateOpen(true)}>
+                  <PlusIcon /> Create your first event
                 </Button>
               )
             }
@@ -500,8 +533,7 @@ export function Landing({ uid }: { uid: string }) {
         </p>
       )}
       <p className="footnote">
-        Browser-local workspace · Anonymous identity · Events expire after 72
-        hours
+        Saved in this browser · no account needed · events expire after 72 hours
       </p>
       <Modal
         open={demoOpen}

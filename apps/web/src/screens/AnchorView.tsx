@@ -118,23 +118,20 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
           <h2>{state.name}</h2>
         </div>
         <div className="row no-print">
-          <button
-            className="icon-button"
-            onClick={poll.refresh}
-            aria-label="Refresh runbook"
-          >
+          {/*
+            Labelled, not just icon-only: an anchor backstage will not guess what the
+            middle glyph does, and the accessible name now matches what is on screen.
+          */}
+          <button className="labelled-icon" onClick={poll.refresh}>
             <ReloadIcon />
+            Refresh
           </button>
-          <button
-            className="icon-button"
-            onClick={() => window.print()}
-            aria-label="Print runbook"
-          >
+          <button className="labelled-icon" onClick={() => window.print()}>
             <FileTextIcon />
+            Print
           </button>
           <button
-            className="icon-button"
-            aria-label="Toggle fullscreen"
+            className="labelled-icon"
             onClick={() => {
               const action = document.fullscreenElement
                 ? document.exitFullscreen()
@@ -145,6 +142,7 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
             }}
           >
             <EnterFullScreenIcon />
+            Full screen
           </button>
         </div>
       </header>
@@ -182,8 +180,8 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
       <StageOverview
         state={state}
         nowAt={nowAt}
-        revision={snapshot.publishedRevision}
         freshness={poll.freshness}
+        lastSyncAt={poll.lastSyncAt}
         stage
       />
       <ReadinessReminder
@@ -258,8 +256,8 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
           {ackPending
             ? "Acknowledging…"
             : ackedRevision === snapshot.publishedRevision
-              ? `Acknowledged revision ${snapshot.publishedRevision}`
-              : `Acknowledge revision ${snapshot.publishedRevision}`}
+              ? `Got it — version ${snapshot.publishedRevision}`
+              : `I’ve got the update (version ${snapshot.publishedRevision})`}
         </button>
         {behind ? (
           <span className="chip chip-warn">
@@ -274,8 +272,8 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
       )}
 
       <p className="muted small">
-        Acknowledgement confirms you received this revision. It does not confirm
-        the words have been spoken.
+        Confirming means you received this update. It does not confirm the words
+        have been spoken.
       </p>
       <section className="anchor-now runbook-full">
         <p className="anchor-label">Complete published agenda</p>

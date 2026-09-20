@@ -13,12 +13,7 @@ describe("stage display", () => {
   it("renders the actual speaker and an aria-hidden countdown without changing the schedule", () => {
     const before = JSON.stringify(state);
     const { container } = render(
-      <StageOverview
-        state={state}
-        nowAt={at(20)}
-        revision={7}
-        freshness="live"
-      />,
+      <StageOverview state={state} nowAt={at(20)} freshness="live" />,
     );
     expect(
       screen.getByRole("heading", {
@@ -37,16 +32,9 @@ describe("stage display", () => {
       ...state,
       cues: state.cues.map((cue) => ({ ...cue, speakerId: null })),
     };
-    render(
-      <StageOverview
-        state={value}
-        nowAt={at(20)}
-        revision={7}
-        freshness="live"
-      />,
-    );
+    render(<StageOverview state={value} nowAt={at(20)} freshness="live" />);
     expect(screen.getByRole("heading", { name: "Event host" })).toBeTruthy();
-    expect(screen.getByText("No speaker assigned")).toBeTruthy();
+    expect(screen.getByText("Hosted by your anchor")).toBeTruthy();
   });
 });
 describe("five-minute timing reminder", () => {
@@ -65,9 +53,7 @@ describe("five-minute timing reminder", () => {
       screen.getByRole("button", { name: "Review recovery options" }),
     );
     expect(callback).toHaveBeenCalledWith("qa");
-    fireEvent.click(
-      screen.getByRole("button", { name: "Dismiss on this screen" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Hide this" }));
     expect(screen.queryByRole("complementary")).toBeNull();
   });
   it("does not show a reminder outside the window or from stale data", () => {
@@ -88,9 +74,7 @@ describe("five-minute timing reminder", () => {
     const { rerender } = render(
       <ReadinessReminder state={state} nowAt={at(20)} freshness="live" />,
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Dismiss on this screen" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Hide this" }));
     const repaired = {
       ...state,
       cues: state.cues.map((c) =>

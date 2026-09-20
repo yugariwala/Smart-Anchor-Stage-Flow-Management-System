@@ -20,3 +20,8 @@ firebase-config.txt
 
 # Scratch output from fixture tooling
 .fixture-source.tmp
+
+# UX walkthrough working captures. The two sets cited by docs/ux-audit.md are committed;
+# these two were intermediate and are reproducible by re-running the walkthrough.
+docs/ux-screens-polish/
+docs/ux-screens-next/

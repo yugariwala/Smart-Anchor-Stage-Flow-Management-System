@@ -74,6 +74,21 @@ export function OrganizerConsole({
   const [releaseMinute, setReleaseMinute] = useState("");
   const [publishOpen, setPublishOpen] = useState(false);
   const [keynoteOpen, setKeynoteOpen] = useState(false);
+  /*
+    A successful mutation used to end in silence: the pending banner vanished and the
+    screen simply stopped moving, which reads as "did that work?". This says what landed,
+    then clears itself so it never becomes stale furniture.
+  */
+  const [confirmation, setConfirmation] = useState("");
+  /*
+    Reassurance should arrive, not be looked up. The ack poll is separate from the
+    revision stream, so this watches it for a version the organizer has not been told
+    about yet and announces it once.
+  */
+  const ackBaseline = useRef<{ ready: boolean; value: number | null }>({
+    ready: false,
+    value: null,
+  });
   const lastEnvelopeRevision = useRef<number | null>(null);
 
   const reload = useCallback(async (): Promise<void> => {
@@ -117,6 +132,38 @@ export function OrganizerConsole({
     }, ACK_POLL_MS);
     return () => window.clearInterval(id);
   }, [reload]);
+
+  useEffect(() => {
+    if (confirmation === "") return;
+    const id = window.setTimeout(() => setConfirmation(""), 8000);
+    return () => window.clearTimeout(id);
+  }, [confirmation]);
+
+  const ackedRevision =
+    envelope?.publishedRevision == null
+      ? null
+      : (envelope.acknowledgments ?? []).some(
+            (a) => a.revision === envelope.publishedRevision,
+          )
+        ? envelope.publishedRevision
+        : null;
+  useEffect(() => {
+    // Nothing has loaded yet, so there is no baseline to compare against.
+    if (envelope === null) return;
+    // Whatever was already acknowledged when this screen opened is not news. Recording
+    // it as the baseline — even when that is "nothing" — is what lets the FIRST real
+    // acknowledgement still announce itself.
+    if (!ackBaseline.current.ready) {
+      ackBaseline.current = { ready: true, value: ackedRevision };
+      return;
+    }
+    if (ackedRevision === null || ackedRevision === ackBaseline.current.value) {
+      return;
+    }
+    ackBaseline.current.value = ackedRevision;
+    // oxlint-disable-next-line react/set-state-in-effect
+    setConfirmation(`Your anchor has version ${ackedRevision}.`);
+  }, [envelope, ackedRevision]);
 
   const state = envelope?.state ?? null;
 
@@ -181,6 +228,9 @@ export function OrganizerConsole({
     );
     if (result) {
       setPublishOpen(false);
+      setConfirmation(
+        "Published. Your anchor's screen now shows this runbook.",
+      );
       await reload();
       poll.refresh();
     }
@@ -205,17 +255,20 @@ export function OrganizerConsole({
           startCueCommand(eventId, step.cueId, rev, key),
         );
       } else if (step.kind === "complete") {
-        result = await command.run(`demo:complete:${step.cueId}:${rev}`, (key) =>
-          completeCueCommand(eventId, step.cueId, rev, key),
+        result = await command.run(
+          `demo:complete:${step.cueId}:${rev}`,
+          (key) => completeCueCommand(eventId, step.cueId, rev, key),
         );
       } else {
-        result = await command.run(`demo:clock:${step.targetMin}:${rev}`, (key) =>
-          setRehearsalClock(
-            eventId,
-            rev,
-            rehearsalClockIso(state.startsAt, step.targetMin),
-            key,
-          ),
+        result = await command.run(
+          `demo:clock:${step.targetMin}:${rev}`,
+          (key) =>
+            setRehearsalClock(
+              eventId,
+              rev,
+              rehearsalClockIso(state.startsAt, step.targetMin),
+              key,
+            ),
         );
       }
       if (result === null) return;
@@ -289,6 +342,13 @@ export function OrganizerConsole({
       ),
     );
     if (result !== null) {
+      setConfirmation(
+        `New plan published. Your anchor's screen now shows it${
+          proposal.result.projectedFinishMin === null
+            ? ""
+            : `, finishing at ${localTime(state.startsAt, proposal.result.projectedFinishMin)}`
+        }.`,
+      );
       setProposal(null);
       await reload();
       poll.refresh();
@@ -338,21 +398,31 @@ export function OrganizerConsole({
             </>
           }
         />
+        {/*
+          One publication status, never two. Showing the poll freshness ("Live") beside
+          the draft phase read as a contradiction: the organizer could not tell whether
+          her anchor could already see the runbook. Before publication there is nothing
+          to be fresh about, so the freshness chip is simply not the right answer yet.
+        */}
         <div className="row spread">
           <div className="row">
-            <FreshnessChip
-              freshness={poll.freshness}
-              revision={envelope?.publishedRevision ?? null}
-            />
-            <span className="chip chip-info">revision {revision}</span>
+            {envelope?.publishedRevision == null ? (
+              <span className="chip chip-warn">
+                Draft — not visible to your anchor yet
+              </span>
+            ) : (
+              <FreshnessChip
+                freshness={poll.freshness}
+                revision={envelope.publishedRevision}
+              />
+            )}
             <span
               className={`chip ${state.scheduleHealth === "valid" ? "chip-ok" : "chip-warn"}`}
             >
               {state.scheduleHealth === "valid"
-                ? "Schedule valid"
-                : "Needs repair"}
+                ? "Timing looks good"
+                : "Timing needs fixing"}
             </span>
-            <span className="chip chip-info">{state.phase}</span>
           </div>
         </div>
 
@@ -369,7 +439,7 @@ export function OrganizerConsole({
           </div>
           <div>
             <CheckCircledIcon />
-            <span>Cues completed</span>
+            <span>Sessions done</span>
             <strong>
               {ordered.filter((c) => c.status === "completed").length}
               <small> / {ordered.length}</small>
@@ -377,7 +447,7 @@ export function OrganizerConsole({
           </div>
           <div>
             <ClockIcon />
-            <span>Hard finish</span>
+            <span>Must finish by</span>
             <strong>
               {localTime(state.startsAt, state.hardEndMin)}
               <small> IST</small>
@@ -385,9 +455,9 @@ export function OrganizerConsole({
           </div>
           <div>
             <PersonIcon />
-            <span>Anchor handoff</span>
+            <span>Anchor</span>
             <strong className="metric-word">
-              {currentAck ? "Received" : "Awaiting ack"}
+              {currentAck ? "Confirmed" : "Not confirmed yet"}
             </strong>
           </div>
         </div>
@@ -435,7 +505,12 @@ export function OrganizerConsole({
         )}
         {command.status === "pending" ? (
           <p className="notice notice-warn" role="alert">
-            Waiting for the server to confirm this action…
+            Saving your change…
+          </p>
+        ) : null}
+        {command.status !== "pending" && confirmation !== "" ? (
+          <p className="notice notice-ok" role="status">
+            {confirmation}
           </p>
         ) : null}
 
@@ -447,8 +522,8 @@ export function OrganizerConsole({
         <StageOverview
           state={state}
           nowAt={state.scenarioNowAt ?? poll.serverNowIso}
-          revision={envelope?.publishedRevision ?? null}
           freshness={poll.freshness}
+          lastSyncAt={poll.lastSyncAt}
         />
         {envelope?.publishedRevision !== null && (
           <ReadinessReminder
@@ -479,12 +554,9 @@ export function OrganizerConsole({
                 <table>
                   <thead>
                     <tr>
-                      <th scope="col">Cue</th>
+                      <th scope="col">Session</th>
                       <th scope="col">Planned</th>
-                      <th scope="col">Actual / forecast</th>
-                      <th scope="col" className="num">
-                        Pref / min
-                      </th>
+                      <th scope="col">Actual / expected</th>
                       <th scope="col" className="num">
                         Rules
                       </th>
@@ -529,9 +601,11 @@ export function OrganizerConsole({
                             <span className="small muted"> server clock</span>
                           ) : null}
                         </td>
-                        <td className="num">
-                          {cue.preferredDurationMin}/{cue.minDurationMin}
-                        </td>
+                        {/*
+                          Planned / shortest lengths were dropped from this table: during a
+                          running event the organizer is not making compression decisions,
+                          and the recovery dialog shows them where they matter.
+                        */}
                         <td className="num small">
                           {cue.fixedStartMin !== null
                             ? `fixed ${localTime(state.startsAt, cue.fixedStartMin)}`
@@ -596,7 +670,7 @@ export function OrganizerConsole({
                     onClick={() => setPublishOpen(true)}
                     disabled={readOnly || state.cues.length === 0}
                   >
-                    {busy ? "Publishing…" : "Validate and publish"}
+                    {busy ? "Publishing…" : "Check and publish"}
                   </button>
                 </div>
               </div>
@@ -634,11 +708,18 @@ export function OrganizerConsole({
                   {state.mode === "rehearsal" ? (
                     <>
                       <h3 className="small">Scenario clock</h3>
-                      <p className="small muted">
-                        The scenario clock advances only forward. Actual times
-                        recorded while it is in use are labelled as
-                        rehearsal-clock times.
-                      </p>
+                      {/*
+                        Read once, then never again — but it was making the rail taller
+                        than the agenda beside it on every single view.
+                      */}
+                      <details className="small muted rail-aside">
+                        <summary>What is this?</summary>
+                        <p>
+                          A practice clock you move yourself. It only ever goes
+                          forward, and anything recorded while it is running is
+                          labelled as a rehearsal time.
+                        </p>
+                      </details>
                       <div className="row">
                         {[1, 5, 10].map((n) => (
                           <button
@@ -655,26 +736,31 @@ export function OrganizerConsole({
                   ) : null}
                 </div>
 
-                <div className="card">
-                  <h2>Report an overrun</h2>
+                {/*
+                  While the event is running this is the urgent control, so it leads
+                  the rail. It previously sat below the rehearsal-clock buttons, which
+                  are demo-only, and an organizer under pressure had to scroll past
+                  them to reach it.
+                */}
+                <div className="card card-priority">
+                  <h2>Running late?</h2>
                   {activeCue === null ? (
                     <p className="small muted">
-                      A repair can be previewed between cues as well; with no
-                      active cue the plan is rebuilt from the current scenario
-                      minute.
+                      You can plan a recovery between sessions too. With nothing
+                      on stage, the plan is rebuilt from the time now.
                     </p>
                   ) : (
                     <p className="small muted">
-                      {activeCue.title} currently forecasts{" "}
+                      {activeCue.title} was due to end at{" "}
                       {state.activeForecastEndMin === null
                         ? "—"
                         : localTime(state.startsAt, state.activeForecastEndMin)}
-                      . Entering a delay sends a new absolute forecast end, so
-                      re-previewing never stacks the delay.
+                      . Tell us how many minutes late it will run — entering it
+                      again replaces the last estimate, it never adds to it.
                     </p>
                   )}
                   <div className="field">
-                    <label htmlFor="delay">Delay in minutes</label>
+                    <label htmlFor="delay">Minutes late</label>
                     <input
                       id="delay"
                       type="number"
@@ -762,13 +848,21 @@ export function OrganizerConsole({
             <div className="card">
               <h2>Anchor</h2>
               <p className="small muted">
-                Published revision{" "}
-                <strong>
-                  {envelope?.publishedRevision ?? "not published"}
-                </strong>
+                {envelope?.publishedRevision == null ? (
+                  <strong>Not published yet</strong>
+                ) : (
+                  <>
+                    Published version{" "}
+                    <strong>{envelope.publishedRevision}</strong>
+                  </>
+                )}
               </p>
               {acks.length === 0 ? (
-                <p className="small muted">No acknowledgements yet.</p>
+                <p className="small muted">
+                  {envelope?.publishedRevision == null
+                    ? "Invite your anchor once you have published."
+                    : "Your anchor has not opened this update yet."}
+                </p>
               ) : (
                 <ul className="small">
                   {acks.map((a) => (
@@ -784,7 +878,7 @@ export function OrganizerConsole({
                           ? "current"
                           : "behind"}
                       </span>{" "}
-                      revision {a.revision} at{" "}
+                      version {a.revision} at{" "}
                       {new Date(a.acknowledgedAt).toLocaleTimeString()}
                     </li>
                   ))}
@@ -792,8 +886,8 @@ export function OrganizerConsole({
               )}
               <p className="small muted">
                 {currentAck === undefined
-                  ? "Publication success and acknowledgement are separate: the anchor may not have seen this revision yet."
-                  : "The anchor has acknowledged receiving this revision. That is not confirmation the words were spoken."}
+                  ? "Publishing and confirming are separate — your anchor may not have opened this update yet."
+                  : "Your anchor has confirmed receiving this update. That is not confirmation the words were spoken."}
               </p>
               <div className="row">
                 <button
@@ -854,10 +948,18 @@ export function OrganizerConsole({
               </Modal>
             </div>
 
+            {/*
+              The raw Firebase UID read as a debug leak. It stays available for
+              support, one disclosure away, rather than in the page footer.
+            */}
             <p className="small muted">
-              Signed in as <span className="mono">{uid}</span>. Demo data
-              expires {new Date(state.expiresAt).toLocaleString()}.
+              Signed in anonymously · this browser only. Demo data expires{" "}
+              {new Date(state.expiresAt).toLocaleString()}.
             </p>
+            <details className="small muted">
+              <summary>Session details</summary>
+              <span className="mono">{uid}</span>
+            </details>
           </div>
         </div>
 
@@ -870,8 +972,8 @@ export function OrganizerConsole({
         >
           <p className="small muted">
             The commands run in order — publish, start and complete the opening,
-            advance the scenario clock to each published cue boundary, then start
-            the keynote. No rule is bypassed and every step is an ordinary
+            advance the scenario clock to each published cue boundary, then
+            start the keynote. No rule is bypassed and every step is an ordinary
             idempotent command.
           </p>
           <div className="row end">
@@ -914,7 +1016,7 @@ export function OrganizerConsole({
             <Button disabled={busy} onClick={() => void onPublish()}>
               {command.status === "pending"
                 ? "Publishing…"
-                : "Validate and publish"}
+                : "Check and publish"}
             </Button>
           </div>
           {command.message && (
@@ -946,8 +1048,8 @@ export function OrganizerConsole({
               command.reset();
             }
           }}
-          title="Review the recovery plan"
-          description="Check every timing change before publishing a new revision."
+          title="Recovery plan"
+          description="Check every timing change before you publish it to your anchor."
           busy={busy}
         >
           {proposal === null ? null : (

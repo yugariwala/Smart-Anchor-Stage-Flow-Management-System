@@ -816,6 +816,18 @@ svg {
   border-color: #e6d4ac;
   border-left-color: var(--warn);
 }
+/* Confirmation that a mutation landed. Carries a check glyph so it is never colour-only. */
+.notice-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: #b0d8c2;
+  border-left-color: var(--ok);
+}
+.notice-ok::before {
+  content: "✓";
+  font-weight: 700;
+  margin-right: 8px;
+}
 .rehearsal-banner {
   background: var(--warn-bg);
   color: var(--warn);
@@ -1884,6 +1896,30 @@ tr.changed > * {
 .stage-overview > div + div {
   border-left: 1px solid #d4e0cf;
 }
+/*
+  `up next` lives outside the activity block so the mobile stack can slot the countdown
+  in front of it. On desktop it is placed back under the activity block in the middle
+  column, which is where it has always rendered.
+*/
+.stage-person {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+.stage-activity {
+  grid-column: 2;
+  grid-row: 1;
+}
+.stage-overview > .stage-up-next {
+  grid-column: 2;
+  grid-row: 2;
+  border-left: 1px solid #d4e0cf;
+  padding: 0 30px 30px;
+  min-width: 0;
+}
+.stage-timing {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
 .stage-eyebrow {
   display: block;
   font-size: 10px;
@@ -2107,12 +2143,39 @@ tr.changed > * {
   .stage-overview {
     grid-template-columns: 1fr;
   }
+  /*
+    Phone order: what is on stage now, how long is left, what is next, then who.
+    The countdown used to sit below `up next` and fell off the bottom of a 390x844
+    screen, so the anchor had to scroll for the one number he checks constantly.
+  */
   .stage-overview > div {
+    grid-column: 1;
+    grid-row: auto;
     padding: 24px;
   }
-  .stage-overview > div + div {
+  .stage-activity {
+    order: 1;
+  }
+  .stage-timing {
+    order: 2;
+  }
+  .stage-overview > .stage-up-next {
+    /* Outranks `.stage-overview > div`, so its desktop cell must be cleared here too. */
+    grid-column: 1;
+    grid-row: auto;
+    order: 3;
+    padding: 24px;
+  }
+  .stage-person {
+    order: 4;
+  }
+  /* Dividers follow the visual order above, not the DOM order. */
+  .stage-overview > div {
     border-left: 0;
     border-top: 1px solid #cddcc4;
+  }
+  .stage-overview > .stage-activity {
+    border-top: 0;
   }
   .stage-person {
     display: grid;
@@ -2147,19 +2210,26 @@ tr.changed > * {
   .stage-person .stage-pronunciation + .small {
     display: none;
   }
+  /*
+    The anchor's one job is knowing what is on stage now. That has to be the largest
+    thing on the screen; the countdown was bigger than it, so the eye landed on a number
+    before it landed on the answer.
+  */
   .stage-cue-title {
-    font-size: 32px;
+    font-size: 54px;
+    line-height: 1.08;
+    margin: 10px 0 14px;
   }
   .stage-countdown {
-    font-size: 76px;
-    margin: 22px 0 15px;
+    font-size: 50px;
+    margin: 16px 0 12px;
   }
   .stage-timing > p,
   .stage-finishes dt,
   .stage-window {
     font-size: 12px;
   }
-  .stage-overview-dark > div + div {
+  .stage-overview-dark > div {
     border-color: #3a5141;
   }
   .script-review-grid {
@@ -2188,4 +2258,159 @@ tr.changed > * {
   .stage-cue-title {
     font-size: 23px;
   }
+}
+
+/*
+  Small-screen legibility. Measured on the deployed anchor view at 390px: the rehearsal
+  banner, the runbook table headers and the "IST" suffixes all computed to 9px, which is
+  not readable at arm's length in the low light an anchor actually works in. §11 fixes the
+  WORDING of the rehearsal banner, not its size, so raising it changes no compliance text.
+*/
+@media (max-width: 480px) {
+  .rehearsal-banner {
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  th {
+    font-size: 13px;
+  }
+  .stage-eyebrow {
+    font-size: 12px;
+    height: auto;
+    min-height: 0;
+  }
+  .stage-finishes small,
+  .stage-finishes dt,
+  .stage-pronunciation span,
+  .stage-window,
+  .stage-timing > p {
+    font-size: 13px;
+  }
+  .footnote,
+  .sidebar-note {
+    font-size: 12px;
+  }
+}
+
+/* Advanced timing rules, collapsed by default on every agenda item. */
+.cue-advanced {
+  margin: 4px 0 0;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.cue-advanced > summary {
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 0.86rem;
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+}
+/* `display: flex` drops the native marker, and without one it does not read as openable. */
+.cue-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+.cue-advanced > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 6px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 150ms ease;
+}
+.cue-advanced[open] > summary::before {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cue-advanced > summary::before {
+    transition: none;
+  }
+}
+.cue-advanced[open] > summary {
+  margin-bottom: 6px;
+}
+.intro-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px;
+  text-align: left;
+}
+.intro-steps li {
+  padding: 4px 0;
+}
+
+/* Lets a rail card lead during a running event without moving it in the markup. */
+.console-grid > div:last-child {
+  display: flex;
+  flex-direction: column;
+}
+.console-grid .card-priority {
+  order: -1;
+}
+
+/* Setup: mode is fixed at creation, so it is stated rather than offered as a control. */
+.mode-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 6px;
+}
+.mode-row p {
+  margin: 0;
+}
+/* A time input paired with an explicit Clear, because "not set" is a real answer. */
+.clock-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.clock-field input {
+  flex: 1 1 auto;
+}
+.clock-field button {
+  flex: 0 0 auto;
+  padding-inline: 12px;
+}
+/* Anchor header controls carry their name, so the glyph is not the only clue. */
+.labelled-icon {
+  gap: 7px;
+  padding: 9px 13px;
+  background: var(--anchor-surface);
+  border-color: #3a5141;
+  color: var(--anchor-text);
+  font-size: 0.8rem;
+}
+.labelled-icon:hover:not(:disabled) {
+  background: #24382e;
+  border-color: #4d6a58;
+}
+.stage-asof {
+  margin-top: -6px;
+}
+
+/*
+  The bottom-left gap on a wide desktop was first attacked by stretching the agenda card
+  to the rail's height. Measured against a real six-session event that produced ~640px of
+  empty space INSIDE a bordered card, which draws more attention than the plain gap did,
+  so the stretch was backed out. The gap is instead reduced at its source, by not letting
+  the rail carry a paragraph of explanation it only needs once (see `.rail-aside`).
+*/
+
+/* An inline "this will be refused" hint, so a bad time is caught before saving. */
+.warn-text {
+  color: var(--warn);
+}
+
+/* Explanations that are read once live behind a disclosure, keeping the rail compact. */
+.rail-aside > summary {
+  cursor: pointer;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+}
+.rail-aside > p {
+  margin: 6px 0 0;
 }

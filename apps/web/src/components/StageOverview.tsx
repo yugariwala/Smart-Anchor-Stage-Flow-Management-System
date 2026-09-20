@@ -4,7 +4,6 @@ import {
   type Speaker,
 } from "@cuepilot/domain";
 import { localTime } from "../lib/format";
-import { FreshnessChip } from "./Freshness";
 import type { Freshness } from "../lib/useSnapshotPoll";
 
 // Presentation contract only. The current backend does not supply photos or roles.
@@ -16,14 +15,15 @@ const countdown = (seconds: number) => {
 export function StageOverview({
   state,
   nowAt,
-  revision,
   freshness,
+  lastSyncAt = null,
   stage = false,
 }: {
   state: EventState;
   nowAt: string;
-  revision: number | null;
   freshness: Freshness;
+  /** When the snapshot behind these numbers last arrived, for the "as of" line. */
+  lastSyncAt?: number | null;
   stage?: boolean;
 }) {
   const view = renderOperationalCue(state, nowAt);
@@ -51,6 +51,27 @@ export function StageOverview({
     speaker?.photoUrl && /^https?:\/\//.test(speaker.photoUrl)
       ? speaker.photoUrl
       : null;
+
+  const currentCue = state.cues.find((c) => c.id === view.current?.cueId);
+  const plannedStartLocal =
+    view.current === null
+      ? ""
+      : localTime(
+          state.startsAt,
+          currentCue?.plannedStartMin ?? view.current.startMin,
+        );
+  const plannedEndLocal =
+    view.current === null
+      ? ""
+      : localTime(
+          state.startsAt,
+          currentCue?.plannedEndMin ?? view.current.endMin,
+        );
+  const plannedDiffers =
+    view.current !== null &&
+    (plannedStartLocal !== view.current.startsAtLocal ||
+      plannedEndLocal !== view.current.endsAtLocal);
+
   return (
     <section
       className={`stage-overview ${stage ? "stage-overview-dark" : ""}`}
@@ -71,7 +92,7 @@ export function StageOverview({
         )}
         <h2>
           {speaker?.displayName ??
-            (view.current ? "Event host" : "Stage standby")}
+            (view.current ? "Event host" : "Nobody on stage")}
         </h2>
         {speaker?.role && <p className="small muted">{speaker.role}</p>}
         {speaker?.pronunciationHint && (
@@ -80,8 +101,17 @@ export function StageOverview({
             {speaker.pronunciationHint}
           </p>
         )}
+        {/*
+          Saying "No speaker assigned" directly beneath a name read as a
+          contradiction. With a session running but no named speaker, the heading
+          above already says who has the stage.
+        */}
         <span className="small muted">
-          {speaker ? "Assigned to the current cue" : "No speaker assigned"}
+          {speaker
+            ? "Speaking now"
+            : view.current
+              ? "Hosted by your anchor"
+              : "Waiting to start"}
         </span>
       </div>
       <div className="stage-activity">
@@ -101,48 +131,45 @@ export function StageOverview({
               ? "That’s a wrap."
               : state.phase === "draft"
                 ? "Ready when you are."
-                : "Between cues")}
+                : "Nothing on stage yet")}
         </h2>
         <p className="stage-window">
           {view.current
-            ? `${view.current.startsAtLocal}–${view.current.endsAtLocal} IST · actual start / forecast end`
+            ? `${view.current.startsAtLocal}–${view.current.endsAtLocal} IST · started / expected to end`
             : state.phase === "draft"
               ? "Review and publish your agenda to begin."
-              : "Waiting for the next cue."}
+              : "Waiting for the next session."}
         </p>
-        {view.current && (
+        {/*
+          The planned window is only worth a line when it DIFFERS from what is actually
+          happening. Printing the same two times twice under different labels was noise
+          on a phone held at arm's length.
+        */}
+        {plannedDiffers && (
           <p className="small muted">
-            Planned window:{" "}
-            {localTime(
-              state.startsAt,
-              state.cues.find((c) => c.id === view.current?.cueId)
-                ?.plannedStartMin ?? view.current.startMin,
-            )}
-            –
-            {localTime(
-              state.startsAt,
-              state.cues.find((c) => c.id === view.current?.cueId)
-                ?.plannedEndMin ?? view.current.endMin,
-            )}{" "}
-            IST
+            Planned: {plannedStartLocal}–{plannedEndLocal} IST
           </p>
         )}
-        <div className="stage-up-next">
-          <span className="stage-eyebrow">UP NEXT</span>
-          <strong>{view.next?.title ?? "Nothing further scheduled"}</strong>
-          {view.next && (
-            <p>
-              {nextSpeaker?.displayName ?? "Event host"}{" "}
-              <span>· {view.next.startsAtLocal} IST</span>
-            </p>
-          )}
-        </div>
+      </div>
+      {/*
+        `up next` is a sibling of the activity block rather than a child of it, so the
+        mobile stack can place the countdown between them. On a 390-wide phone the
+        countdown was previously clipped at the fold — it is the single thing an anchor
+        checks most often.
+      */}
+      <div className="stage-up-next">
+        <span className="stage-eyebrow">UP NEXT</span>
+        <strong>{view.next?.title ?? "Nothing further scheduled"}</strong>
+        {view.next && (
+          <p>
+            {nextSpeaker?.displayName ?? "Event host"}{" "}
+            <span>· {view.next.startsAtLocal} IST</span>
+          </p>
+        )}
       </div>
       <div className="stage-timing">
         <span className="stage-eyebrow">
-          {seconds !== null && seconds < 0
-            ? "PAST FORECAST END"
-            : "TIME REMAINING"}
+          {seconds !== null && seconds < 0 ? "RUNNING OVER" : "TIME REMAINING"}
         </span>
         <div
           className={`stage-countdown ${seconds !== null && seconds < 0 ? "is-overdue" : ""}`}
@@ -152,11 +179,25 @@ export function StageOverview({
         </div>
         <p className="small muted">
           {state.mode === "rehearsal"
-            ? "Scenario clock · advances manually"
+            ? "Practice clock — you move it"
             : freshness !== "live"
               ? "Offline estimate · updates paused"
               : "Synced to the server clock"}
         </p>
+        {/*
+          "Is this current?" was answerable only by hunting for the chip at the top of the
+          page. This answers it where the eye already is, in words rather than a colour.
+        */}
+        {lastSyncAt === null ? null : (
+          <p className="small muted stage-asof">
+            {freshness === "live" ? "Updated" : "Last updated"}{" "}
+            {new Date(lastSyncAt).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+          </p>
+        )}
         <dl className="stage-finishes">
           <div>
             <dt>Projected finish</dt>
@@ -165,13 +206,12 @@ export function StageOverview({
             </dd>
           </div>
           <div>
-            <dt>Hard finish</dt>
+            <dt>Must finish by</dt>
             <dd>
               {localTime(state.startsAt, state.hardEndMin)} <small>IST</small>
             </dd>
           </div>
         </dl>
-        <FreshnessChip freshness={freshness} revision={revision} />
       </div>
     </section>
   );

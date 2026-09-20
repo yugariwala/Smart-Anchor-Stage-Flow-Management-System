@@ -1,0 +1,217 @@
+{
+  "A_landingHeadings": [],
+  "A_landingButtons": [],
+  "A_landingFirstScreen": null,
+  "A_createDialogFields": [
+    {
+      "label": "Event name",
+      "type": "text"
+    },
+    {
+      "label": "Start date & time (IST)",
+      "type": "datetime-local"
+    },
+    {
+      "label": "Hard finish, minutes after start",
+      "type": "number"
+    },
+    {
+      "label": "Event mode",
+      "type": "select-one"
+    }
+  ],
+  "eventId": "f6837d58-8b2a-40bc-ac83-0e7b1965362e",
+  "A_setupDetailFields": [
+    {
+      "label": "Interface language",
+      "type": "select-one"
+    },
+    {
+      "label": "Event name",
+      "type": "text"
+    },
+    {
+      "label": "Start date & time",
+      "type": "datetime-local"
+    },
+    {
+      "label": "Hard finish (minutes after start)",
+      "type": "number"
+    }
+  ],
+  "A_setupTabs": [
+    "Agenda · 0",
+    "Speakers & facts · 0"
+  ],
+  "A_emptyAgendaText": "REHEARSAL · fictional event and speakers · scenario clock.Event setupBuild your agenda and define the commitments your schedule must protect.Draft · revision 1Event detailsAgenda · 0Speakers & facts · 0Event detailsAll times in ISTEvent nameStart date & timeHard finish (minutes after start)The hard finish is a protected commitment, not a suggested duration. Mode: rehearsal.Approved event factsKeep names and context accurate. These facts are retained with their original IDs.Add approved factTry the fictional TechFest scenarioSix cues, three fictional speakers, a fixed sponsor start, and a 60-minute finish.Load scenarioShape the running orderTimes are whole-minute offsets from the event start. The server calculates the schedule when you save.Import CSVAdd cueC·Build your running orderAdd your opening, sessions, transitions, and closing. You can reorder cues before publication.People behind",
+  "A_perCueFields": [
+    {
+      "label": "Interface language",
+      "type": "select-one"
+    },
+    {
+      "label": "Cue title",
+      "type": "text"
+    },
+    {
+      "label": "Speaker",
+      "type": "select-one"
+    },
+    {
+      "label": "Preferred duration",
+      "type": "number"
+    },
+    {
+      "label": "Minimum duration",
+      "type": "number"
+    },
+    {
+      "label": "Shortening priority",
+      "type": "number"
+    },
+    {
+      "label": "Buffer before cue",
+      "type": "number"
+    },
+    {
+      "label": "Available from minute",
+      "type": "number"
+    },
+    {
+      "label": "Fixed start minute",
+      "type": "number"
+    }
+  ],
+  "A_allFieldsAfterScenario": 49,
+  "A_reviewScreenText": "REHEARSAL · fictional event and speakers · scenario clock.TechFest 2026 — Inaugural SessionStage console · Every cue and every change in one place.Anchor viewLiverevision 2Schedule validdraftEvent clock10:00 ISTCues completed0 / 6Hard finish11:00 ISTAnchor handoffAwaiting ackDraft runbook. Not yet published.ON STAGECPStage standbyNo speaker assignedCURRENT ACTIVITYSTANDBYReady when you are.Review and publish your agenda to begin.UP NEXTOpening remarksEvent host · 10:00 ISTTIME REMAINING—:—Scenario clock · advances manuallyProjected finish11:00 ISTHard finish11:00 ISTLiveAgendaCuePlannedActual / forecastPref / minRulesStatusOpening remarks10:00–10:05—5/5—pendingKeynote10:05–10:25—20/20—pendingAudience Q&A10:25–10:35—10/4—pendingCommunity interaction10:35–10:45—10/4—pendingSponsor address10:45–10:55—10/10fixed 10:45pendingClosing and vote of thanks10:55–11:00—5/5—pendingPublish the runbookPublishing validates the full draft and makes it visible to anchors. It does not start the first cue.Edit agendaValidate and publishAnchorPublished revision not publishedNo acknowledgements yet.Publication success and acknowledgement are separate: the anchor may not have seen this revision yet.Invit",
+  "A_publishDialogText": "Publish the runbook?\n\nThis validates your draft and shares the approved agenda with your anchor. Direct agenda and fact editing closes after publication.\n\n6 cues · Hard finish 11:00 IST\n\nKeep reviewing\nValidate and publish",
+  "A_consoleButtons": [
+    "Sign out",
+    "Start Opening remarks",
+    "+1 min",
+    "+5 min",
+    "+10 min",
+    "Preview recovery plan",
+    "Invite an anchor",
+    "Preview anchor view"
+  ],
+  "A_pageErrors": [],
+  "B_inviteDialogText": "Invite your anchor\n\nA private, single-use invitation. Valid for one hour.\n\nSingle-use invitation, valid one hour. Shown once — copy it now.\n\nhttps://smart-anchor-stage-flow-system.web.app/#/join/f6837d58-8b2a-40bc-ac83-0e7b1965362e?code=uNrQYxBGaslKaKD5KbrJLtjqlcicPZl3AeNwoXo2NIM\n\nOpen it in a different browser profile or an incognito window: the same profile would join as you, the owner.\n\nCopy invitation link",
+  "B_metrics": {
+    "undersizedTargets": [],
+    "smallestText": [
+      {
+        "px": 9,
+        "text": "REHEARSAL · fictional event and speakers · sc"
+      },
+      {
+        "px": 9,
+        "text": "IST"
+      },
+      {
+        "px": 9,
+        "text": "IST"
+      },
+      {
+        "px": 9,
+        "text": "Cue"
+      },
+      {
+        "px": 9,
+        "text": "Time (IST)"
+      },
+      {
+        "px": 9,
+        "text": "Speaker"
+      },
+      {
+        "px": 9,
+        "text": "Status"
+      },
+      {
+        "px": 10,
+        "text": "CuePilot"
+      },
+      {
+        "px": 10,
+        "text": "Anchor runbook"
+      },
+      {
+        "px": 10,
+        "text": "ANCHOR RUNBOOK"
+      },
+      {
+        "px": 10,
+        "text": "Live · revision 3"
+      },
+      {
+        "px": 10,
+        "text": "ON STAGE"
+      }
+    ]
+  },
+  "B_aboveFoldText": [
+    "REHEARSAL · fictional event and speakers · scenario clock.",
+    "ANCHOR RUNBOOK",
+    "TechFest 2026 — Inaugural Session",
+    "Runbook loaded, revision 3.",
+    "Live · revision 3",
+    "ON STAGE",
+    "CP",
+    "Stage standby",
+    "No speaker assigned",
+    "CURRENT ACTIVITY",
+    "STANDBY",
+    "Between cues",
+    "Waiting for the next cue.",
+    "UP NEXT",
+    "Opening remarks",
+    "· 10:00 IST",
+    "TIME REMAINING",
+    "—:—",
+    "All approved host copy",
+    "Speaker pronunciation & facts",
+    "Dr. Ananya Mehta",
+    "uh-NAHN-yuh MEH-tah",
+    "Fictional: heads the Applied Systems Lab at a fictional institute.",
+    "Vikram Rao",
+    "VIK-ram RAO",
+    "Fictional: final-year student and TechFest community lead.",
+    "Priya Fernandes",
+    "PREE-yah fer-NAN-dez",
+    "Fictional: represents the fictional sponsor Northwind Labs."
+  ],
+  "B_noHorizontalScroll": true,
+  "C_recoveryControlLabels": [
+    "Delay in minutes",
+    "Preview recovery plan",
+    "Preview anchor view"
+  ],
+  "C_infeasibleText": "Review the recovery plan\n\nCheck every timing change before publishing a new revision.\n\nRepair preview\nNo feasible plan\n\nCalculated from this scenario by the scheduling engine.\n\nSponsor address fixed at 10:45; earliest feasible arrival 10:52; short by 7 minutes. Change a rule or make an organizer decision.\n\nHard-rule checks\npass Minimum durations respected\nfail Fixed start protected: Sponsor address\npass Hard finish protected\n\nThis preview expires at 7:28:39 AM (ten real minutes). The published plan has not changed.\n\nApprove and publish\nDiscard preview\n\nPublishing is disabled because no plan satisfies every rule. CuePilot will not relax a rule on its own.",
+  "C_feasibleText": "Review the recovery plan\n\nCheck every timing change before publishing a new revision.\n\nRepair preview\nFeasible\n\nCalculated from this scenario by the scheduling engine.\n\nRecovered +12 minutes\nWeighted shortening cost 24\nProjected finish 11:00\nOriginal and proposed intervals for pending cues\nCUE\tNOW\tPROPOSED\tMINUTES\nAudience Q&A\t10:25–10:35\t10:37–10:41\t-6 min\nCommunity interaction\t10:35–10:45\t10:41–10:45\t-6 min\nSponsor address\t10:45–10:55\t10:45–10:55\tunchanged\nClosing and vote of thanks\t10:55–11:00\t10:55–11:00\tunchanged\nHard-rule checks\npass Minimum durations respected\npass No overlapping cues: Audience Q&A\npass No overlapping cues: Community interaction\npass Fixed start protected: Sponsor address\npass No overlapping cues: Sponsor address\npass No overlapping cues: Closing and vote of thanks\npass Hard finish protected\n\nThis preview expires at 7:28:40 AM (ten real minutes). The published plan has not changed.\n\nApprove and publish\nDiscard preview",
+  "C_anchorAckLabel": "Acknowledge revision 9",
+  "D_firstViewHasEvents": "",
+  "D_helpText": "",
+  "E_scriptScreenControls": [
+    {
+      "label": "Interface language",
+      "type": "select-one"
+    },
+    {
+      "label": "KindOpeningSpeaker introductionTransitionClosingAnnouncement",
+      "type": "select-one"
+    },
+    {
+      "label": "CueNo specific cueOpening remarksKeynoteAudience Q&ACommunity interactionSponsor addressClosing and vote of thanks",
+      "type": "select-one"
+    },
+    {
+      "label": "LanguageEnglishHindiGujarati",
+      "type": "select-one"
+    },
+    {
+      "label": "LanguageAll languagesEnglishHindiGujarati",
+      "type": "select-one"
+    }
+  ]
+}

@@ -42,25 +42,89 @@ export class ApiCallError extends Error {
  * `NOT_PUBLISHED` is deliberately absent: it is a waiting state the UI renders as such, not
  * an error, and callers check for it explicitly.
  */
+/**
+ * Rule identifiers and schema paths are how the server talks to itself. They are precise
+ * and worth keeping in logs, but `contiguous_order(qa)` is not an answer to a person, so
+ * the few that can actually reach a screen are translated on the way out.
+ */
+const RULE_COPY: Record<string, string> = {
+  contiguous_order: "two sessions would overlap",
+  minimum_durations: "a session would drop below its shortest length",
+  fixed_start: "a session with a fixed start time would move",
+  hard_end: "the event would run past its finish time",
+  buffer: "a gap before a session would be lost",
+  not_before: "a speaker would be needed before they are available",
+  candidate_covers_pending: "a remaining session would have no slot",
+  completed_immutable: "a finished session would change",
+  active_immutable: "the session on stage would change",
+  integer_minutes: "a time would not land on a whole minute",
+  active_forecast_after_now: "the session on stage is already past this plan",
+};
+
+const humanize = (message: string): string => {
+  const rules = message.match(/([a-z_]+)\([^)]*\)|(?<=: )[a-z_]+$/g) ?? [];
+  const named = [
+    ...new Set(
+      rules
+        .map((token) => RULE_COPY[token.replace(/\(.*\)$/, "")])
+        .filter((copy): copy is string => copy !== undefined),
+    ),
+  ];
+  if (named.length > 0) {
+    return `This cannot be published because ${named.join(", and ")}. Adjust the agenda and try again.`;
+  }
+  // Zod uses the same "Too big" / "Too small" shape for strings and numbers, so the
+  // message has to be read before it is rewritten — a number over its maximum is not
+  // "text that is too long".
+  if (/Too big/.test(message)) {
+    const limit = message.match(/<=(\d+)/)?.[1];
+    if (/expected number/.test(message)) {
+      return `That number is too large${limit === undefined ? "" : ` — the maximum is ${limit}`}.`;
+    }
+    return `That text is too long${limit === undefined ? "" : ` — keep it under ${limit} characters`}.`;
+  }
+  if (/Too small/.test(message)) {
+    const limit = message.match(/>=(\d+)/)?.[1];
+    if (/expected number/.test(message)) {
+      return `That number is too small${limit === undefined ? "" : ` — the minimum is ${limit}`}.`;
+    }
+    return "This cannot be left empty.";
+  }
+  if (message === "No such cue.") {
+    return "That session no longer exists. Refresh and try again.";
+  }
+  if (/publication requires at least one cue/.test(message)) {
+    return "Add at least one session before publishing.";
+  }
+  if (/Unrecognized key/.test(message)) {
+    return "Some of this event's data is in an unexpected shape. Reload the page and try again.";
+  }
+  // Anything still carrying a schema path is developer-facing; do not show the path.
+  if (/^Invalid \w+: \S*\./.test(message)) {
+    return "Some details could not be saved. Check the highlighted fields and try again.";
+  }
+  return message;
+};
+
 export const errorCopy = (error: unknown): string => {
   if (!(error instanceof ApiCallError)) {
     return error instanceof Error ? error.message : "Something went wrong.";
   }
   switch (error.code) {
     case "REVISION_CONFLICT":
-      return `The event changed${error.currentRevision === undefined ? "" : ` (now revision ${error.currentRevision})`}. Refresh and preview again.`;
+      return `Someone else changed this event${error.currentRevision === undefined ? "" : ` (now version ${error.currentRevision})`}. Refresh to see the latest, then try again.`;
     case "PROPOSAL_EXPIRED":
-      return "This preview expired after ten minutes. Generate a new one.";
+      return "This plan is more than 10 minutes old. Preview again for current times.";
     case "PROPOSAL_STALE":
-      return "The event moved on since this preview. Generate a new one.";
+      return "The event has moved on since you previewed. Preview again.";
     case "PLAN_TIME_STALE":
-      return "Time advanced and this plan is no longer reachable. Generate a new preview.";
+      return "Too much time has passed — this plan cannot be reached any more. Preview again.";
     case "PROPOSAL_RESULT_DIVERGED":
-      return "The plan changed since this preview. Generate a new one.";
+      return "Something changed, so this is no longer the best plan. Preview again.";
     case "PROPOSAL_INFEASIBLE":
-      return "This plan is not feasible and cannot be published.";
+      return "This will not fit, so there is nothing to publish.";
     case "PROPOSAL_ALREADY_APPLIED":
-      return "That plan has already been published.";
+      return "That plan is already published.";
     case "IDEMPOTENCY_MISMATCH":
       return "That action was already sent with different content. Reload and try again.";
     case "CUE_ORDER_VIOLATION":
@@ -80,11 +144,11 @@ export const errorCopy = (error: unknown): string => {
     case "DEMO_CAPACITY":
       return "This demo has reached its daily capacity. Try again tomorrow.";
     case "VALIDATION_FAILED":
-      return error.message;
+      return humanize(error.message);
     case "NETWORK":
       return "Cannot reach the server.";
     default:
-      return error.message;
+      return humanize(error.message);
   }
 };
 

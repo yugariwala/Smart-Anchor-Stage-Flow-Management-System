@@ -30,7 +30,7 @@ it("requires human review and resets it when the words change", () => {
     />,
   );
   const button = screen.getByRole("button", {
-    name: "Approve and publish copy",
+    name: "Publish this script",
   }) as HTMLButtonElement;
   expect(button.disabled).toBe(true);
   fireEvent.click(screen.getByRole("checkbox"));
@@ -63,7 +63,7 @@ it.each(["expired", "missing source"])(
     expect(
       (
         screen.getByRole("button", {
-          name: "Approve and publish copy",
+          name: "Publish this script",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);

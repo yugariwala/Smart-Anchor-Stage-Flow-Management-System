@@ -1,0 +1,217 @@
+{
+  "A_landingHeadings": [
+    "H1: Keep the show moving together."
+  ],
+  "A_landingButtons": [],
+  "A_landingFirstScreen": null,
+  "A_createDialogFields": [
+    {
+      "label": "Event name",
+      "type": "text"
+    },
+    {
+      "label": "Start date & time (IST)",
+      "type": "datetime-local"
+    },
+    {
+      "label": "Hard finish, minutes after start",
+      "type": "number"
+    },
+    {
+      "label": "Event mode",
+      "type": "select-one"
+    }
+  ],
+  "eventId": "f0cecad7-0615-48f3-8c76-d4d8621625e2",
+  "A_setupDetailFields": [
+    {
+      "label": "Interface language",
+      "type": "select-one"
+    },
+    {
+      "label": "Event name",
+      "type": "text"
+    },
+    {
+      "label": "Start date & time",
+      "type": "datetime-local"
+    },
+    {
+      "label": "Must finish by",
+      "type": "time"
+    }
+  ],
+  "A_setupTabs": [
+    "Agenda · 0",
+    "Speakers & facts · 0"
+  ],
+  "A_emptyAgendaText": "REHEARSAL · fictional event and speakers · scenario clock.Event setupBuild your agenda and define the commitments your schedule must protect.Not published yetEvent detailsAgenda · 0Speakers & facts · 0Event detailsAll times in ISTEvent nameStart date & timeMust finish by60 minutes after the startThis is a promise you are keeping, not a rough guess — CuePilot will never publish a plan that runs past it. Mode: rehearsal.Approved event factsKeep names and context accurate. CuePilot only ever quotes what you put here.Add approved factTry the fictional TechFest scenarioSix sessions, three fictional speakers, a fixed sponsor start, and a 60-minute finish.Load the demo eventShape the running orderGive each item a length in whole minutes. CuePilot works out the clock times for you when you save.Import CSVAdd sessionC·Build your running orderAdd your opening, sessions, transitions, and closing. Y",
+  "A_perCueFields": [
+    {
+      "label": "Interface language",
+      "type": "select-one"
+    },
+    {
+      "label": "Session name",
+      "type": "text"
+    },
+    {
+      "label": "Speaker",
+      "type": "select-one"
+    },
+    {
+      "label": "Planned length (minutes)",
+      "type": "number"
+    },
+    {
+      "label": "Shortest acceptable (minutes)",
+      "type": "number"
+    },
+    {
+      "label": "If we run late",
+      "type": "select-one"
+    },
+    {
+      "label": "Gap before this (minutes)",
+      "type": "number"
+    },
+    {
+      "label": "Speaker not available until (minutes in)",
+      "type": "number"
+    },
+    {
+      "label": "Must start exactly at (minutes in)",
+      "type": "number"
+    }
+  ],
+  "A_allFieldsAfterScenario": 49,
+  "A_reviewScreenText": "REHEARSAL · fictional event and speakers · scenario clock.TechFest 2026 — Inaugural SessionStage console · Every cue and every change in one place.Anchor viewDraft — not visible to your anchor yetTiming looks goodEvent clock10:00 ISTSessions done0 / 6Must finish by11:00 ISTAnchorNot confirmed yetDraft runbook. Not yet published.ON STAGECPNobody on stageWaiting to startCURRENT ACTIVITYSTANDBYReady when you are.Review and publish your agenda to begin.UP NEXTOpening remarksEvent host · 10:00 ISTTIME REMAINING—:—Practice clock — you move itProjected finish11:00 ISTMust finish by11:00 ISTAgendaSessionPlannedActual / expectedPlanned / shortestRulesStatusOpening remarks10:00–10:05—5/5—pendingKeynote10:05–10:25—20/20—pendingAudience Q&A10:25–10:35—10/4—pendingCommunity interaction10:35–10:45—10/4—pendingSponsor address10:45–10:55—10/10fixed 10:45pendingClosing and vote of thanks10:55–11:00—5/5—pendingPublish the runbookPublishing validates the full draft and makes it visible to anchors. It does not start the first cue.Edit agendaCheck and publishAnchorNot published yetNo acknowledgements yet.Publishing and confirming are separate — your anchor may not have opened this update yet.Invite an ",
+  "A_publishDialogText": "Publish the runbook?\n\nThis validates your draft and shares the approved agenda with your anchor. Direct agenda and fact editing closes after publication.\n\n6 cues · Hard finish 11:00 IST\n\nKeep reviewing\nCheck and publish",
+  "A_consoleButtons": [
+    "Sign out",
+    "Start Opening remarks",
+    "+1 min",
+    "+5 min",
+    "+10 min",
+    "Preview recovery plan",
+    "Invite an anchor",
+    "Preview anchor view"
+  ],
+  "A_pageErrors": [],
+  "B_inviteDialogText": "Invite your anchor\n\nA private, single-use invitation. Valid for one hour.\n\nSingle-use invitation, valid one hour. Shown once — copy it now.\n\nhttp://localhost:5173/#/join/f0cecad7-0615-48f3-8c76-d4d8621625e2?code=cISNlTlznqRDlDbLVi0QaZ-4-KIzoLVDipqoGKz0c9Q\n\nOpen it in a different browser profile or an incognito window: the same profile would join as you, the owner.\n\nCopy invitation link",
+  "B_metrics": {
+    "undersizedTargets": [],
+    "smallestText": [
+      {
+        "px": 9,
+        "text": "Session"
+      },
+      {
+        "px": 9,
+        "text": "Time (IST)"
+      },
+      {
+        "px": 9,
+        "text": "Speaker"
+      },
+      {
+        "px": 9,
+        "text": "Status"
+      },
+      {
+        "px": 10,
+        "text": "CuePilot"
+      },
+      {
+        "px": 10,
+        "text": "Anchor runbook"
+      },
+      {
+        "px": 10,
+        "text": "ANCHOR RUNBOOK"
+      },
+      {
+        "px": 10,
+        "text": "Up to date · version 3"
+      },
+      {
+        "px": 10,
+        "text": "Waiting to start"
+      },
+      {
+        "px": 10,
+        "text": "STANDBY"
+      },
+      {
+        "px": 10,
+        "text": "Approved script"
+      },
+      {
+        "px": 10,
+        "text": "Complete published agenda"
+      }
+    ]
+  },
+  "B_aboveFoldText": [
+    "REHEARSAL · fictional event and speakers · scenario clock.",
+    "ANCHOR RUNBOOK",
+    "TechFest 2026 — Inaugural Session",
+    "Runbook loaded, revision 3.",
+    "Up to date · version 3",
+    "CURRENT ACTIVITY",
+    "STANDBY",
+    "Nothing on stage yet",
+    "Waiting for the next session.",
+    "TIME REMAINING",
+    "—:—",
+    "Practice clock — you move it",
+    "Projected finish",
+    "IST",
+    "Must finish by",
+    "All approved host copy",
+    "Speaker pronunciation & facts",
+    "Dr. Ananya Mehta",
+    "uh-NAHN-yuh MEH-tah",
+    "Fictional: heads the Applied Systems Lab at a fictional institute.",
+    "Vikram Rao",
+    "VIK-ram RAO",
+    "Fictional: final-year student and TechFest community lead.",
+    "Priya Fernandes",
+    "PREE-yah fer-NAN-dez",
+    "Fictional: represents the fictional sponsor Northwind Labs."
+  ],
+  "B_noHorizontalScroll": true,
+  "C_recoveryControlLabels": [
+    "Review recovery options",
+    "Minutes late",
+    "Preview recovery plan",
+    "Preview anchor view"
+  ],
+  "C_infeasibleText": "Recovery plan\n\nCheck every timing change before you publish it to your anchor.\n\nThis won’t fit\n\nCalculated from this scenario by the scheduling engine.\n\nThis won’t fit. Sponsor address is locked to 10:45, but the earliest you could reach it is 10:52 — short by 7 minutes. To publish, shorten something, drop an item, or move Sponsor address.\n\nWhat this plan protects\npass Nothing shortened past its shortest length\nfail Fixed start time kept: Sponsor address\npass Still finishes by your deadline\n\nExpires at 08:03 AM (10 minutes from now). The published plan has not changed.\n\nPublish this plan\nCancel\n\nThere is nothing to publish because nothing fits all your fixed commitments. CuePilot won’t quietly break one for you.",
+  "C_feasibleText": "Recovery plan\n\nCheck every timing change before you publish it to your anchor.\n\nThis fits\n\nCalculated from this scenario by the scheduling engine.\n\nRecovered +12 minutes\n2 items shortened\nProjected finish 11:00\nOriginal and proposed intervals for pending cues\nSESSION\tNOW\tPROPOSED\tMINUTES\nAudience Q&A\t10:25–10:35\t10:37–10:41\t-6 min\nCommunity interaction\t10:35–10:45\t10:41–10:45\t-6 min\nSponsor address\t10:45–10:55\t10:45–10:55\tunchanged\nClosing and vote of thanks\t10:55–11:00\t10:55–11:00\tunchanged\nWhy this plan?\nWhat this plan protects\npass Nothing shortened past its shortest length\npass Nothing overlaps: Audience Q&A\npass Nothing overlaps: Community interaction\npass Fixed start time kept: Sponsor address\npass Nothing overlaps: Sponsor address\npass Nothing overlaps: Closing and vote of thanks\npass Still finishes by your deadline\n\nExpires at 08:03 AM (10 minutes from now). The published plan has not changed.\n\nPublish this plan\nCancel",
+  "C_anchorAckLabel": "I’ve got the update (version 10)",
+  "D_firstViewHasEvents": "",
+  "D_helpText": "",
+  "E_scriptScreenControls": [
+    {
+      "label": "Interface language",
+      "type": "select-one"
+    },
+    {
+      "label": "KindOpeningSpeaker introductionTransitionClosingAnnouncement",
+      "type": "select-one"
+    },
+    {
+      "label": "CueNo specific cueOpening remarksKeynoteAudience Q&ACommunity interactionSponsor addressClosing and vote of thanks",
+      "type": "select-one"
+    },
+    {
+      "label": "LanguageEnglishHindiGujarati",
+      "type": "select-one"
+    },
+    {
+      "label": "LanguageAll languagesEnglishHindiGujarati",
+      "type": "select-one"
+    }
+  ]
+}

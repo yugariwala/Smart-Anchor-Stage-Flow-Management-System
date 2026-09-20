@@ -23,7 +23,7 @@ export function FreshnessChip({
 }) {
   const label =
     freshness === "live"
-      ? "Live"
+      ? "Up to date"
       : freshness === "amber"
         ? "Syncing"
         : "Updates paused";
@@ -36,7 +36,7 @@ export function FreshnessChip({
   return (
     <span className={`chip ${cls}`}>
       {label}
-      {revision === null ? "" : ` · revision ${revision}`}
+      {revision === null ? "" : ` · version ${revision}`}
     </span>
   );
 }

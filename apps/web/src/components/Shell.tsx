@@ -15,14 +15,34 @@ import {
 import type { Route } from "../lib/route";
 import { Modal } from "./UI";
 
+/*
+  Grouped by when a link is actually useful. Flat, eight items deep, half of them dead
+  ends until the runbook is published, it read as "eight things you must do now".
+  The Shell has no publication state to disable them with, so it orders them instead.
+*/
 const eventNav = [
-  ["console", "stageConsole", DashboardIcon],
-  ["setup", "eventSetup", CalendarIcon],
-  ["speakers", "speakersFacts", PersonIcon],
-  ["scripts", "hostScripts", ReaderIcon],
-  ["announcements", "announcements", SpeakerLoudIcon],
-  ["history", "revisionHistory", CounterClockwiseClockIcon],
-  ["settings", "eventSettings", GearIcon],
+  {
+    group: "navPrepare",
+    items: [
+      ["setup", "eventSetup", CalendarIcon],
+      ["speakers", "speakersFacts", PersonIcon],
+    ],
+  },
+  {
+    group: "navRunShow",
+    items: [
+      ["console", "stageConsole", DashboardIcon],
+      ["scripts", "hostScripts", ReaderIcon],
+      ["announcements", "announcements", SpeakerLoudIcon],
+    ],
+  },
+  {
+    group: "navAfterwards",
+    items: [
+      ["history", "revisionHistory", CounterClockwiseClockIcon],
+      ["settings", "eventSettings", GearIcon],
+    ],
+  },
 ] as const;
 
 const locales = ["en", "hi", "gu"] as const;
@@ -36,6 +56,9 @@ const uiCopy = {
   en: {
     yourEvents: "Your events",
     eventWorkspace: "Event workspace",
+    navPrepare: "Prepare",
+    navRunShow: "Run the show",
+    navAfterwards: "Afterwards",
     stageConsole: "Stage console",
     eventSetup: "Event setup",
     speakersFacts: "Speakers & facts",
@@ -57,7 +80,6 @@ const uiCopy = {
     stageTagline: "One stage. One shared plan.",
     mainNavigation: "Main navigation",
     humanLed: "Human-led. Stage-ready.",
-    singleStage: "Single-stage event control",
     openNavigation: "Open navigation",
     interfaceLanguage: "Interface language",
     navigateEvent: "Navigate your event.",
@@ -73,6 +95,9 @@ const uiCopy = {
   hi: {
     yourEvents: "आपके कार्यक्रम",
     eventWorkspace: "कार्यक्रम कार्यक्षेत्र",
+    navPrepare: "तैयारी",
+    navRunShow: "कार्यक्रम चलाएँ",
+    navAfterwards: "बाद में",
     stageConsole: "मंच कंसोल",
     eventSetup: "कार्यक्रम सेटअप",
     speakersFacts: "वक्ता और तथ्य",
@@ -94,7 +119,6 @@ const uiCopy = {
     stageTagline: "एक मंच। एक साझा योजना।",
     mainNavigation: "मुख्य नेविगेशन",
     humanLed: "मानव-नेतृत्व। मंच के लिए तैयार।",
-    singleStage: "एकल-मंच कार्यक्रम नियंत्रण",
     openNavigation: "नेविगेशन खोलें",
     interfaceLanguage: "इंटरफ़ेस भाषा",
     navigateEvent: "अपने कार्यक्रम में जाएँ।",
@@ -110,6 +134,9 @@ const uiCopy = {
   gu: {
     yourEvents: "તમારા કાર્યક્રમો",
     eventWorkspace: "કાર્યક્રમ કાર્યક્ષેત્ર",
+    navPrepare: "તૈયારી",
+    navRunShow: "કાર્યક્રમ ચલાવો",
+    navAfterwards: "પછીથી",
     stageConsole: "મંચ કન્સોલ",
     eventSetup: "કાર્યક્રમ સેટઅપ",
     speakersFacts: "વક્તાઓ અને તથ્યો",
@@ -131,7 +158,6 @@ const uiCopy = {
     stageTagline: "એક મંચ. એક સહિયારી યોજના.",
     mainNavigation: "મુખ્ય નેવિગેશન",
     humanLed: "માનવ-સંચાલિત. મંચ માટે તૈયાર.",
-    singleStage: "એકલ-મંચ કાર્યક્રમ નિયંત્રણ",
     openNavigation: "નેવિગેશન ખોલો",
     interfaceLanguage: "ઇન્ટરફેસ ભાષા",
     navigateEvent: "તમારા કાર્યક્રમમાં નેવિગેટ કરો.",
@@ -171,7 +197,10 @@ export function Shell({
     "eventId" in route && route.kind !== "join" && route.kind !== "anchor"
       ? route.eventId
       : null;
-  const navItem = eventNav.find((item) => item[0] === route.kind);
+  // The nav is grouped now, so the page-title lookup searches each group in turn.
+  const navItem = eventNav
+    .map((section) => section.items.find((item) => item[0] === route.kind))
+    .find((item) => item !== undefined);
   const currentPage = navItem
     ? copy[navItem[1]]
     : route.kind === "landing"
@@ -197,22 +226,28 @@ export function Shell({
       </a>
       {eventId && (
         <>
-          <p className="nav-label">{copy.eventWorkspace}</p>
-          {eventNav.map(([key, copyKey, Icon]) => (
-            <a
-              key={key}
-              href={`#/event/${eventId}/${key}`}
-              className={`nav-link ${route.kind === key ? "selected" : ""}`}
-              aria-current={route.kind === key ? "page" : undefined}
-            >
-              <Icon />
-              {copy[copyKey]}
-            </a>
+          {eventNav.map(({ group, items }) => (
+            <div key={group}>
+              <p className="nav-label">{copy[group]}</p>
+              {items.map(([key, copyKey, Icon]) => (
+                <a
+                  key={key}
+                  href={`#/event/${eventId}/${key}`}
+                  className={`nav-link ${route.kind === key ? "selected" : ""}`}
+                  aria-current={route.kind === key ? "page" : undefined}
+                >
+                  <Icon />
+                  {copy[copyKey]}
+                </a>
+              ))}
+              {group === "navRunShow" ? (
+                <a className="nav-link" href={`#/anchor/${eventId}`}>
+                  <ArrowTopRightIcon />
+                  {copy.anchorView}
+                </a>
+              ) : null}
+            </div>
           ))}
-          <a className="nav-link" href={`#/anchor/${eventId}`}>
-            <ArrowTopRightIcon />
-            {copy.anchorView}
-          </a>
         </>
       )}
       <div className="nav-bottom">
@@ -307,7 +342,6 @@ export function Shell({
                 </option>
               ))}
             </select>
-            <span className="small muted">{copy.singleStage}</span>
             <a href="#/help" className="icon-button" aria-label={copy.help}>
               <QuestionMarkCircledIcon />
             </a>
