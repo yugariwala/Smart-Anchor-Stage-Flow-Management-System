@@ -164,7 +164,7 @@ an API test passing counts as "exercised on a running stack".
 | Firebase CLI | ops | **Verified** | Firebase CLI 15.30.2; Hosting release completed | MUST | Invoked through a pinned `npx` deploy command, not a repository dependency |
 | Secret hygiene (full-history scan before every push) | ops | **Verified** | scan run before each of ~12 pushes; 189 blobs, all refs, clean | added-since | `.dev.vars`, `.env.local`, `firebase-config.txt` absent from all history |
 | Local measurements recorded | docs | **Verified** | `docs/measurements.md` | added-since | Labelled as localhost, not passed off as deployed |
-| CI pipeline | ops | **Implemented** | `.github/workflows/ci.yml` | added-since | Runs install, check and production build on pushes and pull requests; first GitHub-hosted run awaits push |
+| CI pipeline | ops | **Verified** | `.github/workflows/ci.yml`; GitHub Actions run `35479081104` | added-since | Push run passed install, check and production build in 47 s |
 
 ---
 
@@ -172,8 +172,8 @@ an API test passing counts as "exercised on a running stack".
 
 | Status | Count |
 |---|---|
-| **Verified** | 80 |
-| **Implemented** | 2 |
+| **Verified** | 81 |
+| **Implemented** | 1 |
 | **Partial** | 1 |
 | **Stubbed** | 0 |
 | **Not built** | 2 |
