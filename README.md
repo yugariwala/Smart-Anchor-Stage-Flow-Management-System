@@ -54,8 +54,8 @@ every hard-rule check — and the shortage quantified when no feasible plan exis
 ## Features and progress
 
 The core product, production deployment, performance sample and browser accessibility checks are
-complete. Global interface chrome supports English, Hindi and Gujarati; full page localisation
-and native-speaker review remain. Next-step enhancements are listed in the
+complete. The full interface supports English, Hindi and Gujarati; native-speaker review of the
+Hindi and Gujarati translations remains. Next-step enhancements are listed in the
 [roadmap](#roadmap--planned-enhancements).
 
 | # | Milestone | Progress |
@@ -69,7 +69,7 @@ and native-speaker review remain. Next-step enhancements are listed in the
 | M5 | Gemini script proposals + approval, template fallback, announcements | Complete |
 | M6 | Offline snapshot cache, countdown offset, printable runbook | Complete |
 | M6 | Accessibility pass (focus management, live regions, keyboard, reduced motion) | Complete |
-| M6 | Full UI localisation (multilingual copy generation already works) | Planned |
+| M6 | Full UI localisation (English, Hindi and Gujarati) | Complete — translations not native-reviewed |
 | Deployment | Firebase Hosting + Cloudflare Worker + production Gemini secret | Complete |
 
 Feature-level status:
@@ -101,7 +101,7 @@ Feature-level status:
 | UX | Offline snapshot cache with the labelled stale view | Complete |
 | UX | Printable runbook (approved copy + speaker facts) | Complete |
 | UX | Accessibility polish (focus traps, live regions, non-colour cues) | Complete |
-| UX | Localised interface chrome (English, Hindi, Gujarati) | Complete |
+| UX | Localised interface and page copy (English, Hindi, Gujarati) | Complete — translations not native-reviewed |
 | Quality | Domain tests on node, API tests in real `workerd`, Playwright browser e2e | Complete |
 | Deployment | Hosted frontend, authenticated Worker, production CORS and real Gemini response | Complete |
 
@@ -119,7 +119,7 @@ owns every schedule.
 | **Natural-language command bar** | The organizer types or dictates "keynote is running 8 minutes late" and the model maps that to the delay/release command. It only interprets intent; the deterministic solver still computes every timestamp. | High |
 | **Push notifications + installable PWA** | A service worker so the runbook is installable, works offline, and pushes approved revisions and announcements to anchors and speakers without an open tab. | Medium |
 | **Post-event analytics report** | Actual vs planned per cue, recovered time, repair cost, and an auto-generated event summary — useful evidence for organizers and sponsors. | Medium |
-| **Localised UI + voice output** | Hindi, Gujarati and English interface chrome plus spoken output, extending the multilingual host copy that already works to the whole app. | Medium |
+| **Localised voice output** | Spoken Hindi, Gujarati and English output for the already-localised interface and multilingual host copy. | Medium |
 | **Role-based collaboration** | Co-organizer and stage-manager roles with their own permissions and a full audit trail, so a large event is not tied to one anonymous browser. | Medium |
 | **Calendar export + QR speaker check-in** | ICS export of the approved runbook and a QR check-in for speakers and anchors on arrival. | Low |
 | **Emergency "cut to next cue" mode** | One-tap broadcast that skips the current cue, re-plans immediately, and pushes a clearly labelled emergency revision to every screen. | Low |

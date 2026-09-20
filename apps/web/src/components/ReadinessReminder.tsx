@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ClockIcon } from "@radix-ui/react-icons";
 import type { EventState } from "@cuepilot/domain";
 import type { Freshness } from "../lib/useSnapshotPoll";
+import { useI18n } from "../lib/i18n";
 
 /** Display-only threshold over published timestamps. Never writes a readiness or schedule state. */
 export function ReadinessReminder({
@@ -15,6 +16,7 @@ export function ReadinessReminder({
   freshness: Freshness;
   onReplan?: (cueId: string) => void;
 }) {
+  const { t } = useI18n();
   const [dismissed, setDismissed] = useState<string | null>(null);
   const cue = state.cues
     .slice()
@@ -34,36 +36,44 @@ export function ReadinessReminder({
   return (
     <aside
       className="readiness-reminder no-print"
-      aria-label="Upcoming cue reminder"
+      aria-label={t("Upcoming cue reminder")}
     >
       <ClockIcon />
       <div>
         <strong>
-          {cue.title} starts in {minutes} {minutes === 1 ? "minute" : "minutes"}
-          .
+          {t("{cue} starts in {minutes} {unit}.", {
+            cue: cue.title,
+            minutes,
+            unit: t(minutes === 1 ? "minute" : "minutes"),
+          })}
         </strong>
         <p>
           {speaker
-            ? `Check that ${speaker.displayName} is ready.`
-            : "Check that your host is ready."}{" "}
-          This is a timing reminder; shared readiness responses are not
-          available yet.
+            ? t("Check that {speaker} is ready.", {
+                speaker: speaker.displayName,
+              })
+            : t("Check that your host is ready.")}{" "}
+          {t(
+            "This is a timing reminder; shared readiness responses are not available yet.",
+          )}
         </p>
         <div className="row">
           {onReplan ? (
             <button onClick={() => onReplan(cue.id)}>
-              Review recovery options
+              {t("Review recovery options")}
             </button>
           ) : (
             <span className="small muted">
-              If they are not ready, tell the organizer before the cue starts.
+              {t(
+                "If they are not ready, tell the organizer before the cue starts.",
+              )}
             </span>
           )}
           <button
             className="text-button"
             onClick={() => setDismissed(reminderId)}
           >
-            Dismiss on this screen
+            {t("Dismiss on this screen")}
           </button>
         </div>
       </div>

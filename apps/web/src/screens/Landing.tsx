@@ -34,10 +34,12 @@ import {
   Modal,
   PageHeading,
 } from "../components/UI";
+import { useI18n } from "../lib/i18n";
 
 const startDefault = () =>
   new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10) + "T10:00";
 export function Landing({ uid }: { uid: string }) {
+  const { t } = useI18n();
   const command = useCommand();
   const [events, setEvents] = useState<RecentEvent[]>(recentEvents);
   const [states, setStates] = useState<Record<string, EventState>>({});
@@ -92,7 +94,7 @@ export function Landing({ uid }: { uid: string }) {
               ...current,
               [event.id]:
                 cause instanceof ApiCallError && cause.code === "NOT_PUBLISHED"
-                  ? "Waiting for publication"
+                  ? t("Waiting for publication")
                   : errorCopy(cause),
             }));
         }
@@ -103,15 +105,13 @@ export function Landing({ uid }: { uid: string }) {
     return () => {
       cancelled = true;
     };
-  }, [events]);
+  }, [events, t]);
   const finishCreation = (result: { state: EventState } | null) => {
     if (result) {
       rememberEvent(result.state, "owner");
       // A seeded event already has an agenda; its next labeled step is on the console.
       const seeded = result.state.demoSeed === "college-demo-v1";
-      navigate(
-        `#/event/${result.state.id}/${seeded ? "console" : "setup"}`,
-      );
+      navigate(`#/event/${result.state.id}/${seeded ? "console" : "setup"}`);
     }
   };
   const createDemo = async (): Promise<void> => {
@@ -144,13 +144,15 @@ export function Landing({ uid }: { uid: string }) {
       Number(duration) > 240
     ) {
       setFormError(
-        "Enter an event name, a start time, and a duration from 1 to 240 minutes.",
+        t(
+          "Enter an event name, a start time, and a duration from 1 to 240 minutes.",
+        ),
       );
       return;
     }
     const startsAt = new Date(start + ":00+05:30");
     if (!Number.isFinite(startsAt.getTime())) {
-      setFormError("Choose a valid event start time.");
+      setFormError(t("Choose a valid event start time."));
       return;
     }
     createdId.current = crypto.randomUUID();
@@ -174,7 +176,9 @@ export function Landing({ uid }: { uid: string }) {
       ? joinUrl.slice(joinUrl.indexOf("#"))
       : joinUrl;
     if (parseRoute(hash).kind !== "join" || !hash.includes("code=")) {
-      setFormError("Paste the complete invitation link, including its code.");
+      setFormError(
+        t("Paste the complete invitation link, including its code."),
+      );
       return;
     }
     navigate(hash);
@@ -184,7 +188,7 @@ export function Landing({ uid }: { uid: string }) {
     setFormError("");
     const id = openId.trim();
     if (!/^[a-zA-Z0-9_-]{1,128}$/.test(id)) {
-      setFormError("Enter a valid event ID.");
+      setFormError(t("Enter a valid event ID."));
       return;
     }
     setOpening(true);
@@ -231,8 +235,10 @@ export function Landing({ uid }: { uid: string }) {
   return (
     <div className="page workspace-page">
       <PageHeading
-        title="Your events"
-        description="A clear plan. A connected team. A stage under control."
+        title={t("Your events")}
+        description={t(
+          "A clear plan. A connected team. A stage under control.",
+        )}
         actions={
           <>
             <button
@@ -241,7 +247,7 @@ export function Landing({ uid }: { uid: string }) {
                 setFormError("");
               }}
             >
-              <Link2Icon /> Join an event
+              <Link2Icon /> {t("Join an event")}
             </button>
             <button
               disabled={busy}
@@ -250,7 +256,7 @@ export function Landing({ uid }: { uid: string }) {
                 setFormError("");
               }}
             >
-              <MagicWandIcon /> Try fictional rehearsal
+              <MagicWandIcon /> {t("Try fictional rehearsal")}
             </button>
             <Button
               size="3"
@@ -259,7 +265,7 @@ export function Landing({ uid }: { uid: string }) {
                 setFormError("");
               }}
             >
-              <PlusIcon /> Create event
+              <PlusIcon /> {t("Create event")}
             </Button>
           </>
         }
@@ -268,31 +274,27 @@ export function Landing({ uid }: { uid: string }) {
         <section className="workspace-intro">
           <div>
             <span className="intro-label">
-              <span className="status-dot" /> YOUR STAGE, IN SYNC
+              <span className="status-dot" /> {t("YOUR STAGE, IN SYNC")}
             </span>
-            <h2>
-              Keep the show
-              <br />
-              moving together.
-            </h2>
+            <h2>{t("Keep the show moving together.")}</h2>
             <p>
-              Prepare your rundown, protect your timing,
-              <br className="desktop-only" /> and keep your anchor on the same
-              page.
+              {t(
+                "Prepare your rundown, protect your timing, and keep your anchor on the same page.",
+              )}
             </p>
             <a href="#/help" className="text-link">
-              Explore the workflow <ArrowRightIcon />
+              {t("Explore the workflow")} <ArrowRightIcon />
             </a>
           </div>
           <div
             className="workflow-visual"
-            aria-label="Workflow: prepare, publish, perform"
+            aria-label={t("Workflow: prepare, publish, perform")}
           >
             <div className="visual-track">
               <span>01</span>
               <div>
-                <strong>Prepare</strong>
-                <small>Every cue in its place</small>
+                <strong>{t("Prepare")}</strong>
+                <small>{t("Every cue in its place")}</small>
               </div>
               <CalendarIcon />
             </div>
@@ -300,8 +302,8 @@ export function Landing({ uid }: { uid: string }) {
             <div className="visual-track visual-active">
               <span>02</span>
               <div>
-                <strong>Publish</strong>
-                <small>One approved runbook</small>
+                <strong>{t("Publish")}</strong>
+                <small>{t("One approved runbook")}</small>
               </div>
               <span className="status-dot" />
             </div>
@@ -309,8 +311,8 @@ export function Landing({ uid }: { uid: string }) {
             <div className="visual-track">
               <span>03</span>
               <div>
-                <strong>Perform</strong>
-                <small>Everyone on the same cue</small>
+                <strong>{t("Perform")}</strong>
+                <small>{t("Everyone on the same cue")}</small>
               </div>
               <ArrowTopRightIcon />
             </div>
@@ -318,7 +320,7 @@ export function Landing({ uid }: { uid: string }) {
         </section>
       )}
       <div className="section-toolbar">
-        <div className="segmented" role="group" aria-label="Filter events">
+        <div className="segmented" role="group" aria-label={t("Filter events")}>
           {[
             ["all", "All events"],
             ["draft", "Drafts"],
@@ -331,15 +333,15 @@ export function Landing({ uid }: { uid: string }) {
               className={filter === value ? "selected" : ""}
               onClick={() => setFilter(value ?? "all")}
             >
-              {label}
+              {t(label ?? "")}
             </button>
           ))}
         </div>
         <label className="search-field">
           <MagnifyingGlassIcon />
           <input
-            aria-label="Search events"
-            placeholder="Search your events…"
+            aria-label={t("Search events")}
+            placeholder={t("Search your events…")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -347,15 +349,19 @@ export function Landing({ uid }: { uid: string }) {
       </div>
       <div className="row spread small muted collection-heading">
         <span>
-          {filtered.length} {filtered.length === 1 ? "event" : "events"} in this
-          browser
+          {t(
+            filtered.length === 1
+              ? "{count} event in this browser"
+              : "{count} events in this browser",
+            { count: filtered.length },
+          )}
         </span>
         <span>
           {checking
-            ? "Checking latest status…"
+            ? t("Checking latest status…")
             : Object.keys(errors).length
-              ? "Some events could not be refreshed"
-              : "Status checked when this page opened"}
+              ? t("Some events could not be refreshed")
+              : t("Status checked when this page opened")}
         </span>
       </div>
       {filtered.length === 0 ? (
@@ -363,13 +369,15 @@ export function Landing({ uid }: { uid: string }) {
           <EmptyState
             title={
               events.length
-                ? "No matching events"
-                : "Your next event starts here"
+                ? t("No matching events")
+                : t("Your next event starts here")
             }
             description={
               events.length
-                ? "Try a different search or filter to find your event."
-                : "Create an event to build your agenda, or join your organizer’s invitation."
+                ? t("Try a different search or filter to find your event.")
+                : t(
+                    "Create an event to build your agenda, or join your organizer’s invitation.",
+                  )
             }
             action={
               events.length > 0 ? (
@@ -379,11 +387,11 @@ export function Landing({ uid }: { uid: string }) {
                     setFilter("all");
                   }}
                 >
-                  Clear filters
+                  {t("Clear filters")}
                 </button>
               ) : (
                 <Button onClick={() => setCreateOpen(true)}>
-                  <PlusIcon /> Create event
+                  <PlusIcon /> {t("Create event")}
                 </Button>
               )
             }
@@ -402,12 +410,13 @@ export function Landing({ uid }: { uid: string }) {
                   <span
                     className={`chip ${state?.phase === "running" ? "chip-ok" : "chip-info"}`}
                   >
-                    {state?.phase ??
-                      (checking
-                        ? "Checking"
+                    {state?.phase
+                      ? t(state.phase)
+                      : checking
+                        ? t("Checking")
                         : event.role === "anchor"
-                          ? "Anchor"
-                          : "Unavailable")}
+                          ? t("Anchor")
+                          : t("Unavailable")}
                   </span>
                 </div>
                 <h2>{state?.name ?? event.name}</h2>
@@ -418,14 +427,18 @@ export function Landing({ uid }: { uid: string }) {
                         dateStyle: "medium",
                         timeStyle: "short",
                       }) + " IST"
-                    : "Saved event shortcut"}
+                    : t("Saved event shortcut")}
                 </p>
                 {state && (
                   <div className="event-facts">
-                    <span>{state.cues.length} cues</span>
-                    <span>{state.hardEndMin} min</span>
                     <span>
-                      {state.mode === "rehearsal" ? "Rehearsal" : "Live mode"}
+                      {t("{count} cues", { count: state.cues.length })}
+                    </span>
+                    <span>{t("{count} min", { count: state.hardEndMin })}</span>
+                    <span>
+                      {state.mode === "rehearsal"
+                        ? t("Rehearsal")
+                        : t("Live mode")}
                     </span>
                   </div>
                 )}
@@ -436,10 +449,12 @@ export function Landing({ uid }: { uid: string }) {
                 )}
                 <div className="event-card-footer">
                   <span className="small muted">
-                    {event.role === "owner" ? "Organizer" : "Anchor"} ·{" "}
+                    {event.role === "owner" ? t("Organizer") : t("Anchor")} ·{" "}
                     {published[event.id] == null
-                      ? "Unpublished"
-                      : `Published R${published[event.id]}`}
+                      ? t("Unpublished")
+                      : t("Published R{revision}", {
+                          revision: published[event.id] ?? "",
+                        })}
                   </span>
                   <a
                     className="text-link"
@@ -449,12 +464,16 @@ export function Landing({ uid }: { uid: string }) {
                         : `#/anchor/${event.id}`
                     }
                   >
-                    Open event <ArrowRightIcon />
+                    {t("Open event")} <ArrowRightIcon />
                   </a>
                 </div>
                 {state && (
                   <p className="event-countdown">
-                    {eventTimingLabel(state, nowMs + (offsets[event.id] ?? 0))}
+                    {eventTimingLabel(
+                      state,
+                      nowMs + (offsets[event.id] ?? 0),
+                      t,
+                    )}
                   </p>
                 )}
                 {errors[event.id] && (
@@ -465,7 +484,7 @@ export function Landing({ uid }: { uid: string }) {
                       setEvents(recentEvents());
                     }}
                   >
-                    Remove shortcut
+                    {t("Remove shortcut")}
                   </button>
                 )}
               </article>
@@ -475,21 +494,21 @@ export function Landing({ uid }: { uid: string }) {
       )}
       <section className="workspace-footer">
         <div>
-          <strong>Already have an event ID?</strong>
+          <strong>{t("Already have an event ID?")}</strong>
           <p className="small muted">
-            Open an event this identity owns or has joined.
+            {t("Open an event this identity owns or has joined.")}
           </p>
         </div>
         <form onSubmit={(event) => void open(event)} className="row">
           <input
-            aria-label="Event ID"
-            placeholder="Paste event ID"
+            aria-label={t("Event ID")}
+            placeholder={t("Paste event ID")}
             value={openId}
             onChange={(e) => setOpenId(e.target.value)}
             required
           />
           <button disabled={opening}>
-            {opening ? "Opening…" : "Open event"}
+            {opening ? t("Opening…") : t("Open event")}
             <ArrowRightIcon />
           </button>
         </form>
@@ -500,23 +519,26 @@ export function Landing({ uid }: { uid: string }) {
         </p>
       )}
       <p className="footnote">
-        Browser-local workspace · Anonymous identity · Events expire after 72
-        hours
+        {t(
+          "Browser-local workspace · Anonymous identity · Events expire after 72 hours",
+        )}
       </p>
       <Modal
         open={demoOpen}
         onClose={() => setDemoOpen(false)}
-        title="Try the fictional rehearsal?"
-        description="Creates a personal, labeled rehearsal event seeded with the committed six-cue scenario."
+        title={t("Try the fictional rehearsal?")}
+        description={t(
+          "Creates a personal, labeled rehearsal event seeded with the committed six-cue scenario.",
+        )}
         busy={busy}
       >
         <p className="small muted">
-          Opening → keynote → Q&amp;A → community interaction → sponsor fixed at
-          10:45 → closing at 11:00. Every speaker, fact and event detail is
-          fictional, and the scenario clock is controlled by you.
+          {t(
+            "Opening → keynote → Q&A → community interaction → sponsor fixed at 10:45 → closing at 11:00. Every speaker, fact and event detail is fictional, and the scenario clock is controlled by you.",
+          )}
         </p>
         <p className="notice small">
-          REHEARSAL · fictional event and speakers · scenario clock.
+          {t("REHEARSAL · fictional event and speakers · scenario clock.")}
         </p>
         {formError && (
           <p className="error" role="alert">
@@ -525,10 +547,12 @@ export function Landing({ uid }: { uid: string }) {
         )}
         <div className="row end">
           <button disabled={busy} onClick={() => setDemoOpen(false)}>
-            Cancel
+            {t("Cancel")}
           </button>
           <Button disabled={busy} onClick={() => void createDemo()}>
-            {command.status === "pending" ? "Creating…" : "Create rehearsal"}
+            {command.status === "pending"
+              ? t("Creating…")
+              : t("Create rehearsal")}
           </Button>
         </div>
         {demoAttempted && (
@@ -546,27 +570,31 @@ export function Landing({ uid }: { uid: string }) {
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Create your event"
-        description="Start with a blank agenda. You can load the fictional scenario in rehearsal setup."
+        title={t("Create your event")}
+        description={t(
+          "Start with a blank agenda. You can load the fictional scenario in rehearsal setup.",
+        )}
         busy={busy}
       >
         <form onSubmit={(event) => void create(event)}>
           <fieldset disabled={busy}>
             <div className="field">
-              <label htmlFor="event-name">Event name</label>
+              <label htmlFor="event-name">{t("Event name")}</label>
               <input
                 id="event-name"
                 autoFocus
                 required
                 maxLength={120}
-                placeholder="e.g. Campus innovation summit"
+                placeholder={t("e.g. Campus innovation summit")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
             <div className="form-grid">
               <div className="field">
-                <label htmlFor="event-start">Start date & time (IST)</label>
+                <label htmlFor="event-start">
+                  {t("Start date & time (IST)")}
+                </label>
                 <input
                   id="event-start"
                   type="datetime-local"
@@ -577,7 +605,7 @@ export function Landing({ uid }: { uid: string }) {
               </div>
               <div className="field">
                 <label htmlFor="duration">
-                  Hard finish, minutes after start
+                  {t("Hard finish, minutes after start")}
                 </label>
                 <input
                   id="duration"
@@ -591,7 +619,7 @@ export function Landing({ uid }: { uid: string }) {
               </div>
             </div>
             <div className="field">
-              <label htmlFor="mode">Event mode</label>
+              <label htmlFor="mode">{t("Event mode")}</label>
               <select
                 id="mode"
                 value={mode}
@@ -600,19 +628,20 @@ export function Landing({ uid }: { uid: string }) {
                 }
               >
                 <option value="rehearsal">
-                  Rehearsal · manual scenario clock
+                  {t("Rehearsal · manual scenario clock")}
                 </option>
-                <option value="live">Live · actual server clock</option>
+                <option value="live">{t("Live · actual server clock")}</option>
               </select>
             </div>
             <p className="notice small">
-              Mode cannot change after creation. Demo data expires after 72
-              hours. Maximum two creations per identity per day; shared capacity
-              also applies.
+              {t(
+                "Mode cannot change after creation. Demo data expires after 72 hours. Maximum two creations per identity per day; shared capacity also applies.",
+              )}
             </p>
             <p className="small muted">
-              Keep this browser session. Signing out or clearing browser storage
-              loses access to your events.
+              {t(
+                "Keep this browser session. Signing out or clearing browser storage loses access to your events.",
+              )}
             </p>
             {formError && (
               <p className="error" role="alert">
@@ -621,10 +650,12 @@ export function Landing({ uid }: { uid: string }) {
             )}
             <div className="row end">
               <button type="button" onClick={() => setCreateOpen(false)}>
-                Cancel
+                {t("Cancel")}
               </button>
               <Button type="submit" size="3">
-                {command.status === "pending" ? "Creating…" : "Create event"}
+                {command.status === "pending"
+                  ? t("Creating…")
+                  : t("Create event")}
                 <ArrowRightIcon />
               </Button>
             </div>
@@ -640,12 +671,14 @@ export function Landing({ uid }: { uid: string }) {
       <Modal
         open={joinOpen}
         onClose={() => setJoinOpen(false)}
-        title="Join as an anchor"
-        description="Use the private invitation link your organizer shared with you."
+        title={t("Join as an anchor")}
+        description={t(
+          "Use the private invitation link your organizer shared with you.",
+        )}
       >
         <form onSubmit={join}>
           <div className="field">
-            <label htmlFor="invite-url">Invitation link</label>
+            <label htmlFor="invite-url">{t("Invitation link")}</label>
             <input
               id="invite-url"
               required
@@ -660,10 +693,10 @@ export function Landing({ uid }: { uid: string }) {
             </p>
           )}
           <p className="small muted">
-            Invitations are single-use and expire after one hour.
+            {t("Invitations are single-use and expire after one hour.")}
           </p>
           <Button type="submit">
-            Open invitation
+            {t("Open invitation")}
             <ArrowRightIcon />
           </Button>
         </form>

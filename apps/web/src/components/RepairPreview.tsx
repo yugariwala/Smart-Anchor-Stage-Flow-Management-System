@@ -13,6 +13,7 @@ import type { Cue, EventState, RepairResult } from "@cuepilot/domain";
 import { useEffect, useState } from "react";
 
 import { localTime, signedMinutes } from "../lib/format";
+import { useI18n } from "../lib/i18n";
 
 const titleOf = (state: EventState, cueId: string | null): string => {
   if (cueId === null) return "the plan";
@@ -63,6 +64,7 @@ export function RepairPreviewPanel({
   approving: boolean;
   approveMessage: string;
 }) {
+  const { t } = useI18n();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -75,9 +77,9 @@ export function RepairPreviewPanel({
   return (
     <div className="card">
       <div className="row spread">
-        <h2>Repair preview</h2>
+        <h2>{t("Repair preview")}</h2>
         <span className={`chip ${result.feasible ? "chip-ok" : "chip-bad"}`}>
-          {result.feasible ? "Feasible" : "No feasible plan"}
+          {result.feasible ? t("Feasible") : t("No feasible plan")}
         </span>
       </div>
 
@@ -90,16 +92,17 @@ export function RepairPreviewPanel({
         <>
           <div className="row small muted">
             <span>
-              Recovered <strong>{signedMinutes(result.recoveredMin)}</strong>{" "}
-              minutes
-              {result.recoveredMin < 0 ? " (restored time)" : ""}
+              {t("Recovered")}{" "}
+              <strong>{signedMinutes(result.recoveredMin)}</strong>{" "}
+              {t("minutes")}
+              {result.recoveredMin < 0 ? ` ${t("(restored time)")}` : ""}
             </span>
             <span>
-              Weighted shortening cost{" "}
+              {t("Weighted shortening cost")}{" "}
               <strong>{result.weightedShorteningCost}</strong>
             </span>
             <span>
-              Projected finish{" "}
+              {t("Projected finish")}{" "}
               <strong>
                 {result.projectedFinishMin === null
                   ? "—"
@@ -111,20 +114,20 @@ export function RepairPreviewPanel({
           <div
             className="table-scroll"
             role="region"
-            aria-label="Recovery comparison"
+            aria-label={t("Recovery comparison")}
             tabIndex={0}
           >
             <table>
               <caption className="sr-only">
-                Original and proposed intervals for pending cues
+                {t("Original and proposed intervals for pending cues")}
               </caption>
               <thead>
                 <tr>
-                  <th scope="col">Cue</th>
-                  <th scope="col">Now</th>
-                  <th scope="col">Proposed</th>
+                  <th scope="col">{t("Cue")}</th>
+                  <th scope="col">{t("Now")}</th>
+                  <th scope="col">{t("Proposed")}</th>
                   <th scope="col" className="num">
-                    Minutes
+                    {t("Minutes")}
                   </th>
                 </tr>
               </thead>
@@ -156,8 +159,8 @@ export function RepairPreviewPanel({
                       </td>
                       <td className="num">
                         {delta === 0
-                          ? "unchanged"
-                          : `${signedMinutes(delta)} min`}
+                          ? t("unchanged")
+                          : `${signedMinutes(delta)} ${t("minute")}`}
                       </td>
                     </tr>
                   );
@@ -172,22 +175,24 @@ export function RepairPreviewPanel({
         </p>
       )}
 
-      <h3 className="small">Hard-rule checks</h3>
+      <h3 className="small">{t("Hard-rule checks")}</h3>
       <ul className="small">
         {result.constraintChecks.map((check, i) => (
           <li key={`${check.rule}-${check.cueId ?? "all"}-${i}`}>
             <span className={`chip ${check.passed ? "chip-ok" : "chip-bad"}`}>
-              {check.passed ? "pass" : "fail"}
+              {check.passed ? t("pass") : t("fail")}
             </span>{" "}
-            {RULE_LABELS[check.rule] ?? check.rule}
+            {t(RULE_LABELS[check.rule] ?? check.rule)}
             {check.cueId === null ? "" : `: ${titleOf(state, check.cueId)}`}
           </li>
         ))}
       </ul>
 
       <p className="small muted">
-        This preview expires at {new Date(expiresAt).toLocaleTimeString()} (ten
-        real minutes). The published plan has not changed.
+        {t(
+          "This preview expires at {time} (ten real minutes). The published plan has not changed.",
+          { time: new Date(expiresAt).toLocaleTimeString() },
+        )}
       </p>
 
       <div className="row">
@@ -198,21 +203,22 @@ export function RepairPreviewPanel({
           disabled={!result.feasible || approving || expired}
           aria-describedby={result.feasible ? undefined : "why-disabled"}
         >
-          {approving ? "Publishing…" : "Approve and publish"}
+          {approving ? t("Publishing…") : t("Approve and publish")}
         </button>
         <button type="button" onClick={onDiscard} disabled={approving}>
-          Discard preview
+          {t("Discard preview")}
         </button>
       </div>
       {expired && (
         <p className="notice notice-warn" role="status">
-          This preview has expired. Discard it and calculate a new plan.
+          {t("This preview has expired. Discard it and calculate a new plan.")}
         </p>
       )}
       {result.feasible ? null : (
         <p id="why-disabled" className="small muted">
-          Publishing is disabled because no plan satisfies every rule. CuePilot
-          will not relax a rule on its own.
+          {t(
+            "Publishing is disabled because no plan satisfies every rule. CuePilot will not relax a rule on its own.",
+          )}
         </p>
       )}
       {approveMessage === "" ? null : (

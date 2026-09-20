@@ -192,6 +192,20 @@ The visual pass found and fixed an unreadable agenda header and a footer that cr
 otherwise blank third page. The final two-page rendering has no clipped text, overlap or stray
 background region. This is browser and visual evidence, not a formal screen-reader audit.
 
+### Full-interface localisation verification (2026-09-20)
+
+The English/Hindi/Gujarati selector now applies to page content and controls across the workspace,
+setup, organizer console, anchor runbook, speaker/script/announcement/history/settings pages and
+Help—not only the global navigation. A local full-rehearsal Playwright run passed in Chrome in
+41.6 seconds, including Hindi reload persistence and Hindi/Gujarati workspace heading and
+description assertions. The full Vitest suite passed 332 tests, including interpolation, fallback
+and representative page-copy checks in `apps/web/test/i18n.test.ts`.
+
+This verifies application behavior and translation coverage, not linguistic quality. Hindi and
+Gujarati translations have not been reviewed by qualified native speakers, and no such quality
+claim is made. Exact English compliance labels required by the product specification remain
+unchanged deliberately.
+
 ## NOT YET MEASURED
 
 These §18 targets still require evidence.

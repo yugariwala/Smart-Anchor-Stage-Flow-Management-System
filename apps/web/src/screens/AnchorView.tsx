@@ -26,8 +26,10 @@ import { rememberEvent } from "../lib/storage";
 import { RunbookTable } from "./EventPages";
 import { StageOverview } from "../components/StageOverview";
 import { ReadinessReminder } from "../components/ReadinessReminder";
+import { useI18n } from "../lib/i18n";
 
 export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
+  const { t } = useI18n();
   const poll = useSnapshotPoll(eventId);
   const [ackedRevision, setAckedRevision] = useState<number | null>(null);
   const [ackError, setAckError] = useState<string>("");
@@ -53,10 +55,10 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
     lastAnnounced.current = revision;
     setAnnouncement(
       first
-        ? `Runbook loaded, revision ${revision}.`
-        : `Updated: revision ${revision} published.`,
+        ? t("Runbook loaded, revision {revision}.", { revision })
+        : t("Updated: revision {revision} published.", { revision }),
     );
-  }, [revision]);
+  }, [revision, t]);
 
   if (snapshot === null) {
     return (
@@ -64,7 +66,7 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
         <h1 className="anchor-title">CuePilot</h1>
         {poll.notPublished ? (
           <p className="anchor-line" role="status">
-            Waiting for the organizer to publish the runbook.
+            {t("Waiting for the organizer to publish the runbook.")}
           </p>
         ) : poll.error !== null ? (
           <p className="anchor-line" role="status">
@@ -72,13 +74,13 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
           </p>
         ) : (
           <p className="anchor-line" role="status">
-            Loading the published runbook{"…"}
+            {t("Loading the published runbook…")}
           </p>
         )}
         <div className="row">
-          <button onClick={poll.refresh}>Retry connection</button>
+          <button onClick={poll.refresh}>{t("Retry connection")}</button>
           <a className="button-link" href="#/">
-            Back to events
+            {t("Back to events")}
           </a>
         </div>
       </div>
@@ -114,33 +116,35 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
       <RehearsalBanner mode={state.mode} />
       <header className="anchor-header">
         <div>
-          <p className="anchor-label">ANCHOR RUNBOOK</p>
+          <p className="anchor-label">{t("ANCHOR RUNBOOK")}</p>
           <h2>{state.name}</h2>
         </div>
         <div className="row no-print">
           <button
             className="icon-button"
             onClick={poll.refresh}
-            aria-label="Refresh runbook"
+            aria-label={t("Refresh runbook")}
           >
             <ReloadIcon />
           </button>
           <button
             className="icon-button"
             onClick={() => window.print()}
-            aria-label="Print runbook"
+            aria-label={t("Print runbook")}
           >
             <FileTextIcon />
           </button>
           <button
             className="icon-button"
-            aria-label="Toggle fullscreen"
+            aria-label={t("Toggle fullscreen")}
             onClick={() => {
               const action = document.fullscreenElement
                 ? document.exitFullscreen()
                 : document.documentElement.requestFullscreen();
               void action.catch(() =>
-                setDisplayError("Fullscreen is unavailable in this browser."),
+                setDisplayError(
+                  t("Fullscreen is unavailable in this browser."),
+                ),
               );
             }}
           >
@@ -150,8 +154,10 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
       </header>
       {state.ownerUid === uid && (
         <p className="notice small no-print">
-          Organizer preview. Only an invited anchor can acknowledge this
-          runbook. <a href={`#/event/${eventId}/console`}>Return to console</a>
+          {t(
+            "Organizer preview. Only an invited anchor can acknowledge this runbook.",
+          )}{" "}
+          <a href={`#/event/${eventId}/console`}>{t("Return to console")}</a>
         </p>
       )}
       {displayError && <p role="status">{displayError}</p>}
@@ -166,10 +172,10 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
           revision={snapshot.publishedRevision}
         />
         {view.scheduleHealth === "needs_repair" ? (
-          <span className="chip chip-warn">Schedule needs repair</span>
+          <span className="chip chip-warn">{t("Schedule needs repair")}</span>
         ) : null}
         {poll.fromCache ? (
-          <span className="chip chip-bad">Cached copy</span>
+          <span className="chip chip-bad">{t("Cached copy")}</span>
         ) : null}
       </div>
 
@@ -194,7 +200,7 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
       <p className="anchor-line">{view.line}</p>
 
       <section className="anchor-now">
-        <p className="anchor-label">Approved script</p>
+        <p className="anchor-label">{t("Approved script")}</p>
         {state.approvedScripts.filter(
           (script) =>
             script.cueId === null ||
@@ -202,8 +208,9 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
             (view.current === null && script.cueId === view.next?.cueId),
         ).length === 0 ? (
           <p className="muted">
-            No approved copy for this cue yet. The organizer drafts and approves
-            host copy from the Scripts page; it appears here once approved.
+            {t(
+              "No approved copy for this cue yet. The organizer drafts and approves host copy from the Scripts page; it appears here once approved.",
+            )}
           </p>
         ) : (
           state.approvedScripts
@@ -222,8 +229,8 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
                   {script.source === "template"
                     ? "Template fallback — AI unavailable."
                     : script.source === "gemini"
-                      ? "AI-generated copy · reviewed and approved"
-                      : "Human-written copy"}{" "}
+                      ? t("AI-generated copy · reviewed and approved")
+                      : t("Human-written copy")}{" "}
                   · {script.language.toUpperCase()}
                 </p>
               </article>
@@ -235,7 +242,7 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
         .filter((a) => a.dismissedAt === null)
         .map((a) => (
           <section className="anchor-now announcement-banner" key={a.id}>
-            <p className="anchor-label">Announcement</p>
+            <p className="anchor-label">{t("Announcement")}</p>
             <p lang={a.language} className="script-body">
               {a.text}
             </p>
@@ -256,14 +263,20 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
           }
         >
           {ackPending
-            ? "Acknowledging…"
+            ? t("Acknowledging…")
             : ackedRevision === snapshot.publishedRevision
-              ? `Acknowledged revision ${snapshot.publishedRevision}`
-              : `Acknowledge revision ${snapshot.publishedRevision}`}
+              ? t("Acknowledged revision {revision}", {
+                  revision: snapshot.publishedRevision,
+                })
+              : t("Acknowledge revision {revision}", {
+                  revision: snapshot.publishedRevision,
+                })}
         </button>
         {behind ? (
           <span className="chip chip-warn">
-            Behind: you acknowledged revision {ackedRevision}
+            {t("Behind: you acknowledged revision {revision}", {
+              revision: ackedRevision,
+            })}
           </span>
         ) : null}
       </div>
@@ -274,15 +287,16 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
       )}
 
       <p className="muted small">
-        Acknowledgement confirms you received this revision. It does not confirm
-        the words have been spoken.
+        {t(
+          "Acknowledgement confirms you received this revision. It does not confirm the words have been spoken.",
+        )}
       </p>
       <section className="anchor-now runbook-full">
-        <p className="anchor-label">Complete published agenda</p>
+        <p className="anchor-label">{t("Complete published agenda")}</p>
         <RunbookTable state={state} />
       </section>
       <section className="print-only">
-        <h2>All approved host copy</h2>
+        <h2>{t("All approved host copy")}</h2>
         {state.approvedScripts.map((script) => (
           <article key={script.id}>
             <h3>
@@ -293,11 +307,12 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
               {script.body}
             </p>
             <p>
-              {script.source} · Approved {script.approvedAt}
+              {script.source} ·{" "}
+              {t("Approved {time}", { time: script.approvedAt })}
             </p>
           </article>
         ))}
-        <h2>Speaker pronunciation & facts</h2>
+        <h2>{t("Speaker pronunciation & facts")}</h2>
         {state.speakers.map((speaker) => (
           <article key={speaker.id}>
             <h3>{speaker.displayName}</h3>
@@ -311,11 +326,15 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
         ))}
       </section>
       <footer className="small muted">
-        Published revision {snapshot.publishedRevision} · Last synced{" "}
-        {poll.lastSyncAt
-          ? new Date(poll.lastSyncAt).toLocaleString()
-          : "not synced"}{" "}
-        · Times in IST. Printed copies do not update.
+        {t(
+          "Published revision {revision} · Last synced {time} · Times in IST. Printed copies do not update.",
+          {
+            revision: snapshot.publishedRevision,
+            time: poll.lastSyncAt
+              ? new Date(poll.lastSyncAt).toLocaleString()
+              : t("not synced"),
+          },
+        )}
       </footer>
     </div>
   );

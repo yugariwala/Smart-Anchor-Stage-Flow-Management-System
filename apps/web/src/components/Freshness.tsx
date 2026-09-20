@@ -7,6 +7,7 @@
  */
 
 import type { Freshness } from "../lib/useSnapshotPoll";
+import { useI18n } from "../lib/i18n";
 
 const hhmmss = (ms: number): string => {
   const d = new Date(ms);
@@ -21,12 +22,13 @@ export function FreshnessChip({
   freshness: Freshness;
   revision: number | null;
 }) {
+  const { t } = useI18n();
   const label =
     freshness === "live"
-      ? "Live"
+      ? t("Live")
       : freshness === "amber"
-        ? "Syncing"
-        : "Updates paused";
+        ? t("Syncing")
+        : t("Updates paused");
   const cls =
     freshness === "live"
       ? "chip-ok"
@@ -36,7 +38,7 @@ export function FreshnessChip({
   return (
     <span className={`chip ${cls}`}>
       {label}
-      {revision === null ? "" : ` · revision ${revision}`}
+      {revision === null ? "" : ` · ${t("revision")} ${revision}`}
     </span>
   );
 }
@@ -54,15 +56,22 @@ export function StaleSnapshotNotice({
   revision: number | null;
   lastSyncAt: number | null;
 }) {
+  const { t } = useI18n();
   if (freshness !== "stale") return null;
   return (
     <p className="notice notice-bad small" role="status">
-      Offline snapshot {"·"} revision {revision ?? "—"} {"·"} last synced{" "}
-      {lastSyncAt === null ? "never" : hhmmss(lastSyncAt)}. Updates paused.
+      {t(
+        "Offline snapshot · revision {revision} · last synced {time}. Updates paused.",
+        {
+          revision: revision ?? "—",
+          time: lastSyncAt === null ? t("never") : hhmmss(lastSyncAt),
+        },
+      )}
       <br />
       <span className="small">
-        Any countdown shown is an estimate from cached timing, not live
-        coordination.
+        {t(
+          "Any countdown shown is an estimate from cached timing, not live coordination.",
+        )}
       </span>
     </p>
   );

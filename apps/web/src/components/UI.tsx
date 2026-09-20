@@ -1,6 +1,7 @@
 import { Dialog, Button } from "@radix-ui/themes";
 import { Cross2Icon, ReloadIcon } from "@radix-ui/react-icons";
 import { Component, useRef, type ReactNode } from "react";
+import { useI18n } from "../lib/i18n";
 
 export function PageHeading({
   title,
@@ -41,14 +42,12 @@ export function EmptyState({
     </div>
   );
 }
-export function Loading({
-  label = "Loading your workspace",
-}: {
-  label?: string;
-}) {
+export function Loading({ label }: { label?: string }) {
+  const { t } = useI18n();
+  const resolvedLabel = label ?? t("Loading your workspace");
   return (
-    <div className="page" role="status" aria-label={label}>
-      <p className="muted">{label}…</p>
+    <div className="page" role="status" aria-label={resolvedLabel}>
+      <p className="muted">{resolvedLabel}…</p>
       <div className="skeleton skeleton-heading" />
       <div className="skeleton skeleton-panel" />
       <div className="skeleton skeleton-panel" />
@@ -62,20 +61,21 @@ export function ErrorState({
   message: string;
   retry?: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="page">
       <EmptyState
-        title="This view isn’t available"
+        title={t("This view isn’t available")}
         description={message}
         action={
           <div className="row">
             {retry && (
               <Button onClick={retry}>
-                <ReloadIcon /> Try again
+                <ReloadIcon /> {t("Try again")}
               </Button>
             )}
             <a className="button-link" href="#/">
-              Back to events
+              {t("Back to events")}
             </a>
           </div>
         }
@@ -98,6 +98,7 @@ export function Modal({
   children: ReactNode;
   busy?: boolean;
 }) {
+  const { t } = useI18n();
   const returnFocus = useRef<HTMLElement | null>(null);
   return (
     <Dialog.Root
@@ -135,7 +136,7 @@ export function Modal({
           className="icon-button modal-close"
           onClick={onClose}
           disabled={busy}
-          aria-label="Close dialog"
+          aria-label={t("Close dialog")}
         >
           <Cross2Icon />
         </button>
@@ -153,6 +154,7 @@ export function CommandNotice({
   message: string;
   retry?: () => void;
 }) {
+  const { t } = useI18n();
   if (!message) return null;
   return (
     <div
@@ -162,7 +164,7 @@ export function CommandNotice({
       <p>{message}</p>
       {status === "unknown" && retry && (
         <button type="button" onClick={retry}>
-          Retry original request
+          {t("Retry original request")}
         </button>
       )}
     </div>
@@ -177,13 +179,18 @@ export class ErrorBoundary extends Component<
     return { failed: true };
   }
   override render() {
-    return this.state.failed ? (
-      <ErrorState
-        message="The application could not display this page. Reload to recover your session."
-        retry={() => window.location.reload()}
-      />
-    ) : (
-      this.props.children
-    );
+    return this.state.failed ? <LocalizedError /> : this.props.children;
   }
+}
+
+function LocalizedError() {
+  const { t } = useI18n();
+  return (
+    <ErrorState
+      message={t(
+        "The application could not display this page. Reload to recover your session.",
+      )}
+      retry={() => window.location.reload()}
+    />
+  );
 }

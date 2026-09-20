@@ -34,6 +34,7 @@ import {
   Modal,
   CommandNotice,
 } from "../components/UI";
+import { localeNames, useI18n } from "../lib/i18n";
 
 const titles = {
   speakers: "Speakers & facts",
@@ -50,7 +51,7 @@ const descriptions = {
   history: "An immutable record of changes to the event.",
   settings: "Event details, retention, and workspace controls.",
 } as const;
-const languageNames = { en: "English", hi: "Hindi", gu: "Gujarati" };
+const languageNames = localeNames;
 export function EventPages({
   eventId,
   page,
@@ -58,25 +59,29 @@ export function EventPages({
   eventId: string;
   page: Exclude<EventPage, "setup" | "console">;
 }) {
+  const { t } = useI18n();
   const { data, loading, error, reload } = useEvent(eventId);
-  if (loading && !data) return <Loading label={`Loading ${page}`} />;
+  if (loading && !data)
+    return <Loading label={t("Loading {page}", { page })} />;
   if (error) return <ErrorState message={error} retry={() => void reload()} />;
   if (!data)
-    return <ErrorState message="The server did not return an event." />;
+    return <ErrorState message={t("The server did not return an event.")} />;
   const state = data.state;
   return (
     <>
       <RehearsalBanner mode={state.mode} />
       <div className="page">
         <PageHeading
-          title={titles[page]}
-          description={descriptions[page]}
+          title={t(titles[page])}
+          description={t(descriptions[page])}
           actions={
             <>
-              <span className="chip chip-info">Revision {state.revision}</span>
+              <span className="chip chip-info">
+                {t("Revision {revision}", { revision: state.revision })}
+              </span>
               <button
                 className="icon-button"
-                aria-label="Refresh page"
+                aria-label={t("Refresh page")}
                 onClick={() => void reload()}
               >
                 <ReloadIcon />
@@ -108,6 +113,7 @@ export function EventPages({
   );
 }
 function Speakers({ state }: { state: EventState }) {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const speakers = state.speakers.filter((s) =>
     s.displayName.toLowerCase().includes(search.toLowerCase()),
@@ -118,28 +124,32 @@ function Speakers({ state }: { state: EventState }) {
         <label className="search-field">
           <PersonIcon />
           <input
-            aria-label="Search speakers"
+            aria-label={t("Search speakers")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Find a speaker…"
+            placeholder={t("Find a speaker…")}
           />
         </label>
         {state.phase === "draft" ? (
           <a className="button-link" href={`#/event/${state.id}/setup`}>
-            Edit speakers
+            {t("Edit speakers")}
             <ArrowRightIcon />
           </a>
         ) : (
-          <span className="small muted">Facts locked after publication</span>
+          <span className="small muted">
+            {t("Facts locked after publication")}
+          </span>
         )}
       </div>
       {!speakers.length ? (
         <EmptyState
-          title={search ? "No matching speakers" : "No speakers added yet"}
+          title={
+            search ? t("No matching speakers") : t("No speakers added yet")
+          }
           description={
             search
-              ? "Try another name."
-              : "Add speakers and approved facts in event setup."
+              ? t("Try another name.")
+              : t("Add speakers and approved facts in event setup.")
           }
         />
       ) : (
@@ -157,11 +167,12 @@ function Speakers({ state }: { state: EventState }) {
                 <div>
                   <h2>{speaker.displayName}</h2>
                   <p className="small muted">
-                    {speaker.pronunciationHint || "No pronunciation hint added"}
+                    {speaker.pronunciationHint ||
+                      t("No pronunciation hint added")}
                   </p>
                 </div>
               </div>
-              <h3 className="small">Approved facts</h3>
+              <h3 className="small">{t("Approved facts")}</h3>
               {speaker.facts.length ? (
                 <ul className="fact-list">
                   {speaker.facts.map((fact) => (
@@ -169,7 +180,7 @@ function Speakers({ state }: { state: EventState }) {
                   ))}
                 </ul>
               ) : (
-                <p className="small muted">No approved facts yet.</p>
+                <p className="small muted">{t("No approved facts yet.")}</p>
               )}
               <div className="speaker-cues">
                 {state.cues
@@ -186,7 +197,7 @@ function Speakers({ state }: { state: EventState }) {
       )}
       {state.eventFacts.length > 0 && (
         <section className="card">
-          <h2>Event facts</h2>
+          <h2>{t("Event facts")}</h2>
           <ul className="fact-list">
             {state.eventFacts.map((fact) => (
               <li key={fact.id}>{fact.text}</li>
@@ -206,6 +217,7 @@ function Scripts({
   eventId: string;
   reload: () => void;
 }) {
+  const { t } = useI18n();
   const command = useCommand();
   const [draft, setDraft] = useState<ScriptDraftResponse | null>(null);
   const busy = command.status === "pending" || command.status === "unknown";
@@ -235,41 +247,42 @@ function Scripts({
       <section className="capability-note">
         <ReaderIcon />
         <div>
-          <strong>Draft host copy from approved facts</strong>
+          <strong>{t("Draft host copy from approved facts")}</strong>
           <p>
-            The model only ever sees facts you approved, and it never sets a
-            time. Every draft is reviewed by you before it reaches the stage.
+            {t(
+              "The model only ever sees facts you approved, and it never sets a time. Every draft is reviewed by you before it reaches the stage.",
+            )}
           </p>
         </div>
       </section>
 
       <div className="card">
-        <h2>Generate a draft</h2>
+        <h2>{t("Generate a draft")}</h2>
         <div className="row">
           <label className="row small" htmlFor="script-kind">
-            Kind
+            {t("Kind")}
             <select
               id="script-kind"
               disabled={busy}
               value={kind}
               onChange={(e) => setKind(e.target.value as typeof kind)}
             >
-              <option value="opening">Opening</option>
-              <option value="introduction">Speaker introduction</option>
-              <option value="transition">Transition</option>
-              <option value="closing">Closing</option>
-              <option value="announcement">Announcement</option>
+              <option value="opening">{t("Opening")}</option>
+              <option value="introduction">{t("Speaker introduction")}</option>
+              <option value="transition">{t("Transition")}</option>
+              <option value="closing">{t("Closing")}</option>
+              <option value="announcement">{t("Announcement")}</option>
             </select>
           </label>
           <label className="row small" htmlFor="script-cue">
-            Cue
+            {t("Cue")}
             <select
               id="script-cue"
               value={cueId}
               disabled={busy}
               onChange={(e) => setCueId(e.target.value)}
             >
-              <option value="">No specific cue</option>
+              <option value="">{t("No specific cue")}</option>
               {state.cues.map((cue) => (
                 <option key={cue.id} value={cue.id}>
                   {cue.title}
@@ -278,7 +291,7 @@ function Scripts({
             </select>
           </label>
           <label className="row small" htmlFor="script-language">
-            Language
+            {t("Language")}
             <select
               id="script-language"
               value={language}
@@ -320,13 +333,16 @@ function Scripts({
                 });
             }}
           >
-            {command.status === "pending" ? "Drafting\u2026" : "Generate draft"}
+            {command.status === "pending"
+              ? t("Drafting…")
+              : t("Generate draft")}
           </button>
         </div>
         {language !== "en" && (
           <p className="small muted">
-            Hindi and Gujarati output is marked “generated; language quality
-            unverified” until a qualified reviewer has read it.
+            {t(
+              "Hindi and Gujarati output is marked “generated; language quality unverified” until a qualified reviewer has read it.",
+            )}
           </p>
         )}
         <CommandNotice
@@ -382,16 +398,17 @@ function Scripts({
       )}
       <div className="section-toolbar">
         <h2>
-          Approved host copy <span className="muted">({scripts.length})</span>
+          {t("Approved host copy")}{" "}
+          <span className="muted">({scripts.length})</span>
         </h2>
         <label className="row small" htmlFor="script-filter-language">
-          Language
+          {t("Language")}
           <select
             id="script-filter-language"
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
           >
-            <option value="all">All languages</option>
+            <option value="all">{t("All languages")}</option>
             {Object.entries(languageNames).map(([code, name]) => (
               <option key={code} value={code}>
                 {name}
@@ -402,8 +419,10 @@ function Scripts({
       </div>
       {!scripts.length ? (
         <EmptyState
-          title="No approved scripts"
-          description="Generate a draft above, review it against your approved facts, then publish it to the anchor."
+          title={t("No approved scripts")}
+          description={t(
+            "Generate a draft above, review it against your approved facts, then publish it to the anchor.",
+          )}
         />
       ) : (
         scripts.map((script) => (
@@ -425,12 +444,15 @@ function Scripts({
                 {script.source === "template"
                   ? "Template fallback — AI unavailable."
                   : script.source === "gemini"
-                    ? "AI-generated copy · reviewed and approved"
-                    : "Human-written copy"}{" "}
-                · Approved {new Date(script.approvedAt).toLocaleString()}
+                    ? t("AI-generated copy · reviewed and approved")
+                    : t("Human-written copy")}{" "}
+                ·{" "}
+                {t("Approved {time}", {
+                  time: new Date(script.approvedAt).toLocaleString(),
+                })}
               </span>
               <button onClick={() => setReviewId(script.id)}>
-                View source facts
+                {t("View source facts")}
               </button>
             </div>
           </article>
@@ -439,27 +461,29 @@ function Scripts({
       <Modal
         open={!!script}
         onClose={() => setReviewId(null)}
-        title="Approved script & source facts"
-        description="Read-only provenance for the approved copy."
+        title={t("Approved script & source facts")}
+        description={t("Read-only provenance for the approved copy.")}
       >
         {script && (
           <>
             <p className="script-body" lang={script.language}>
               {script.body}
             </p>
-            <h3>Referenced facts</h3>
+            <h3>{t("Referenced facts")}</h3>
             <ul className="fact-list">
               {script.usedFactIds.map((id) => (
                 <li key={id}>
                   {facts.find((f) => f.id === id)?.text ??
-                    "Referenced fact is not present in this snapshot."}
+                    t("Referenced fact is not present in this snapshot.")}
                 </li>
               ))}
             </ul>
             <p className="small muted">
-              Source: {script.source}
-              {script.model ? ` · Model: ${script.model}` : ""} · Approved{" "}
-              {new Date(script.approvedAt).toLocaleString()}
+              {t("Source")}: {script.source}
+              {script.model ? ` · ${t("Model")}: ${script.model}` : ""} ·{" "}
+              {t("Approved {time}", {
+                time: new Date(script.approvedAt).toLocaleString(),
+              })}
             </p>
           </>
         )}
@@ -476,6 +500,7 @@ function Announcements({
   eventId: string;
   reload: () => void;
 }) {
+  const { t } = useI18n();
   const command = useCommand();
   const busy = command.status === "pending" || command.status === "unknown";
   const [filter, setFilter] = useState("active");
@@ -489,18 +514,19 @@ function Announcements({
       <section className="capability-note">
         <SpeakerLoudIcon />
         <div>
-          <strong>Publish a message to your anchor</strong>
+          <strong>{t("Publish a message to your anchor")}</strong>
           <p>
-            You write every word. Publishing is the approval step, and the
-            message travels in the same published snapshot as the schedule.
+            {t(
+              "You write every word. Publishing is the approval step, and the message travels in the same published snapshot as the schedule.",
+            )}
           </p>
         </div>
       </section>
 
       <div className="card">
-        <h2>New announcement</h2>
+        <h2>{t("New announcement")}</h2>
         <div className="field">
-          <label htmlFor="ann-text">Message</label>
+          <label htmlFor="ann-text">{t("Message")}</label>
           <textarea
             disabled={busy}
             id="ann-text"
@@ -509,13 +535,15 @@ function Announcements({
             value={text}
             lang={language}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Type the exact words the anchor should see."
+            placeholder={t("Type the exact words the anchor should see.")}
           />
-          <span className="small muted">{text.length}/500 characters</span>
+          <span className="small muted">
+            {t("{count}/500 characters", { count: text.length })}
+          </span>
         </div>
         <div className="row">
           <label className="row small" htmlFor="announcement-language">
-            Language
+            {t("Language")}
             <select
               id="announcement-language"
               value={language}
@@ -555,13 +583,14 @@ function Announcements({
             }}
           >
             {command.status === "pending"
-              ? "Publishing\u2026"
-              : "Publish announcement"}
+              ? t("Publishing…")
+              : t("Publish announcement")}
           </button>
         </div>
         <p className="small muted">
-          CuePilot never writes an announcement for you. There is no automatic
-          emergency wording.
+          {t(
+            "CuePilot never writes an announcement for you. There is no automatic emergency wording.",
+          )}
         </p>
         <CommandNotice
           status={command.status}
@@ -580,28 +609,30 @@ function Announcements({
         <div
           className="segmented"
           role="group"
-          aria-label="Announcement filter"
+          aria-label={t("Announcement filter")}
         >
           <button
             className={filter === "active" ? "selected" : ""}
             aria-pressed={filter === "active"}
             onClick={() => setFilter("active")}
           >
-            Active
+            {t("Active")}
           </button>
           <button
             className={filter === "all" ? "selected" : ""}
             aria-pressed={filter === "all"}
             onClick={() => setFilter("all")}
           >
-            All messages
+            {t("All messages")}
           </button>
         </div>
       </div>
       {!messages.length ? (
         <EmptyState
-          title="No announcements here"
-          description="Published messages will be shown here and in the anchor runbook. No message has been sent."
+          title={t("No announcements here")}
+          description={t(
+            "Published messages will be shown here and in the anchor runbook. No message has been sent.",
+          )}
         />
       ) : (
         messages.map((message) => (
@@ -610,7 +641,7 @@ function Announcements({
               <span
                 className={`chip ${message.dismissedAt ? "chip-info" : "chip-ok"}`}
               >
-                {message.dismissedAt ? "Dismissed" : "Active"}
+                {message.dismissedAt ? t("Dismissed") : t("Active")}
               </span>
               <span className="small muted">
                 {new Date(message.publishedAt).toLocaleString()} ·{" "}
@@ -639,7 +670,7 @@ function Announcements({
                     });
                 }}
               >
-                Dismiss banner
+                {t("Dismiss banner")}
               </button>
             )}
           </article>
@@ -649,6 +680,7 @@ function Announcements({
   );
 }
 function History({ eventId }: { eventId: string }) {
+  const { t } = useI18n();
   const [items, setItems] = useState<RevisionEntry[]>([]);
   const [before, setBefore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -709,32 +741,34 @@ function History({ eventId }: { eventId: string }) {
         <div className="notice notice-bad" role="alert">
           {error}
           <button onClick={() => void load(items.length ? before : null)}>
-            Retry history
+            {t("Retry history")}
           </button>
         </div>
       )}
       {loading && !items.length ? (
-        <Loading label="Loading revision history" />
+        <Loading label={t("Loading revision history")} />
       ) : !items.length ? (
         <EmptyState
-          title="No published revisions yet"
-          description="Save your draft and publish it from the stage console to create a runbook revision."
+          title={t("No published revisions yet")}
+          description={t(
+            "Save your draft and publish it from the stage console to create a runbook revision.",
+          )}
         />
       ) : (
         <section
           className="card table-scroll"
           role="region"
-          aria-label="Revision history"
+          aria-label={t("Revision history")}
           tabIndex={0}
         >
           <table>
             <thead>
               <tr>
-                <th scope="col">Revision</th>
-                <th scope="col">Change</th>
-                <th scope="col">Published at</th>
-                <th scope="col">Actor</th>
-                <th scope="col">Details</th>
+                <th scope="col">{t("Revision")}</th>
+                <th scope="col">{t("Change")}</th>
+                <th scope="col">{t("Published at")}</th>
+                <th scope="col">{t("Actor")}</th>
+                <th scope="col">{t("Details")}</th>
               </tr>
             </thead>
             <tbody>
@@ -754,7 +788,9 @@ function History({ eventId }: { eventId: string }) {
                         setSelected(item.revision);
                       }}
                     >
-                      View revision {item.revision}
+                      {t("View revision {revision}", {
+                        revision: item.revision,
+                      })}
                     </button>
                   </td>
                 </tr>
@@ -765,38 +801,44 @@ function History({ eventId }: { eventId: string }) {
       )}
       {before !== null && (
         <button disabled={loading} onClick={() => void load(before)}>
-          {loading ? "Loading…" : "Load older revisions"}
+          {loading ? t("Loading…") : t("Load older revisions")}
         </button>
       )}
       <p className="small muted">
-        Published snapshots are immutable. Restoring an old snapshot is not
-        supported.
+        {t(
+          "Published snapshots are immutable. Restoring an old snapshot is not supported.",
+        )}
       </p>
       <Modal
         open={selected !== null}
         onClose={() => setSelected(null)}
-        title={`Revision ${selected ?? ""}`}
-        description="Historical snapshot. This is not the current stage view."
+        title={t("Revision {revision}", { revision: selected ?? "" })}
+        description={t(
+          "Historical snapshot. This is not the current stage view.",
+        )}
       >
         {detailError ? (
           <p className="notice notice-bad" role="alert">
             {detailError}
           </p>
         ) : !detail ? (
-          <Loading label="Loading revision" />
+          <Loading label={t("Loading revision")} />
         ) : (
           <>
             <RehearsalBanner mode={detail.mode} />
             <h2>{detail.name}</h2>
             <p className="small muted">
-              {detail.phase} ·{" "}
+              {t(detail.phase)} ·{" "}
               {detail.scheduleHealth === "valid"
-                ? "Schedule valid"
-                : "Needs repair"}{" "}
-              · Updated {new Date(detail.updatedAt).toLocaleString()}
+                ? t("Schedule valid")
+                : t("Needs repair")}{" "}
+              ·{" "}
+              {t("Updated {time}", {
+                time: new Date(detail.updatedAt).toLocaleString(),
+              })}
             </p>
             <RunbookTable state={detail} />
-            <h3>Approved copy</h3>
+            <h3>{t("Approved copy")}</h3>
             {detail.approvedScripts.length ? (
               detail.approvedScripts.map((script) => (
                 <p
@@ -808,17 +850,19 @@ function History({ eventId }: { eventId: string }) {
                 </p>
               ))
             ) : (
-              <p className="muted">No approved scripts in this revision.</p>
+              <p className="muted">
+                {t("No approved scripts in this revision.")}
+              </p>
             )}
-            <h3>Announcements</h3>
+            <h3>{t("Announcements")}</h3>
             {detail.announcements.length ? (
               detail.announcements.map((a) => (
                 <p lang={a.language} key={a.id}>
-                  {a.text} ({a.dismissedAt ? "dismissed" : "active"})
+                  {a.text} ({a.dismissedAt ? t("dismissed") : t("active")})
                 </p>
               ))
             ) : (
-              <p className="muted">No announcements in this revision.</p>
+              <p className="muted">{t("No announcements in this revision.")}</p>
             )}
           </>
         )}
@@ -827,20 +871,21 @@ function History({ eventId }: { eventId: string }) {
   );
 }
 export function RunbookTable({ state }: { state: EventState }) {
+  const { t } = useI18n();
   return (
     <div
       className="table-scroll"
       role="region"
-      aria-label="Published agenda"
+      aria-label={t("Published agenda")}
       tabIndex={0}
     >
       <table>
         <thead>
           <tr>
-            <th scope="col">Cue</th>
-            <th scope="col">Time (IST)</th>
-            <th scope="col">Speaker</th>
-            <th scope="col">Status</th>
+            <th scope="col">{t("Cue")}</th>
+            <th scope="col">{t("Time (IST)")}</th>
+            <th scope="col">{t("Speaker")}</th>
+            <th scope="col">{t("Status")}</th>
           </tr>
         </thead>
         <tbody>
@@ -858,7 +903,7 @@ export function RunbookTable({ state }: { state: EventState }) {
                   {state.speakers.find((s) => s.id === cue.speakerId)
                     ?.displayName ?? "—"}
                 </td>
-                <td>{cue.status}</td>
+                <td>{t(cue.status)}</td>
               </tr>
             ))}
         </tbody>
@@ -873,6 +918,7 @@ function Settings({
   state: EventState;
   reload: () => void;
 }) {
+  const { t } = useI18n();
   const command = useCommand();
   const [confirm, setConfirm] = useState(false);
   const [typed, setTyped] = useState("");
@@ -887,30 +933,30 @@ function Settings({
   return (
     <>
       <section className="card">
-        <h2>Event identity</h2>
+        <h2>{t("Event identity")}</h2>
         <dl className="settings-list">
           <div>
-            <dt>Name</dt>
+            <dt>{t("Name")}</dt>
             <dd>{state.name}</dd>
           </div>
           <div>
-            <dt>Event ID</dt>
+            <dt>{t("Event ID")}</dt>
             <dd className="mono">{state.id}</dd>
           </div>
           <div>
-            <dt>Mode</dt>
-            <dd>{state.mode}</dd>
+            <dt>{t("Mode")}</dt>
+            <dd>{t(state.mode)}</dd>
           </div>
           <div>
-            <dt>Phase</dt>
-            <dd>{state.phase}</dd>
+            <dt>{t("Phase")}</dt>
+            <dd>{t(state.phase)}</dd>
           </div>
           <div>
-            <dt>Timezone</dt>
+            <dt>{t("Timezone")}</dt>
             <dd>Asia/Kolkata (IST)</dd>
           </div>
           <div>
-            <dt>Data expires</dt>
+            <dt>{t("Data expires")}</dt>
             <dd>{new Date(state.expiresAt).toLocaleString()}</dd>
           </div>
         </dl>
@@ -918,49 +964,53 @@ function Settings({
           onClick={() => {
             void navigator.clipboard
               .writeText(state.id)
-              .then(() => setCopied("Event ID copied."))
+              .then(() => setCopied(t("Event ID copied.")))
               .catch(() =>
                 setCopied(
-                  "Copy unavailable. Select the event ID above and copy it.",
+                  t("Copy unavailable. Select the event ID above and copy it."),
                 ),
               );
           }}
         >
-          Copy event ID
+          {t("Copy event ID")}
         </button>
         <span className="small muted" role="status">
           {copied}
         </span>
       </section>
       <section className="card">
-        <h2>Anonymous session</h2>
+        <h2>{t("Anonymous session")}</h2>
         <p className="muted">
-          Only this browser identity can manage the event. There is no permanent
-          account or recovery flow. Invitations grant anchor access only.
+          {t(
+            "Only this browser identity can manage the event. There is no permanent account or recovery flow. Invitations grant anchor access only.",
+          )}
         </p>
         <p className="small muted">
-          Owner ID: <span className="mono">{state.ownerUid}</span>
+          {t("Owner ID:")} <span className="mono">{state.ownerUid}</span>
         </p>
       </section>
       <section className="card danger-zone">
-        <h2>Delete event</h2>
+        <h2>{t("Delete event")}</h2>
         <p>
-          This permanently removes the event, its runbook, revisions, and anchor
-          access. Local shortcuts and snapshots are also cleared.
+          {t(
+            "This permanently removes the event, its runbook, revisions, and anchor access. Local shortcuts and snapshots are also cleared.",
+          )}
         </p>
         <button className="danger" onClick={() => setConfirm(true)}>
-          Delete event
+          {t("Delete event")}
         </button>
       </section>
       <Modal
         open={confirm}
         onClose={() => setConfirm(false)}
-        title="Permanently delete this event?"
-        description="This cannot be undone. Anchors will lose access to the published runbook."
+        title={t("Permanently delete this event?")}
+        description={t(
+          "This cannot be undone. Anchors will lose access to the published runbook.",
+        )}
         busy={busy}
       >
         <div className="field">
-          <label htmlFor="delete-confirm">Type DELETE to confirm</label>
+          <label htmlFor="delete-confirm">{t("Type DELETE to confirm")}</label>
           <input
             id="delete-confirm"
             autoComplete="off"
@@ -975,15 +1025,16 @@ function Settings({
         />
         {command.code === "NOT_FOUND" && (
           <p className="notice notice-warn">
-            The event is no longer available. A previous deletion may have
-            succeeded.
+            {t(
+              "The event is no longer available. A previous deletion may have succeeded.",
+            )}
             <button
               onClick={() => {
                 forgetEvent(state.id);
                 navigate("#/");
               }}
             >
-              Remove local copy
+              {t("Remove local copy")}
             </button>
           </p>
         )}
@@ -995,12 +1046,12 @@ function Settings({
               reload();
             }}
           >
-            Refresh event before deleting
+            {t("Refresh event before deleting")}
           </button>
         )}
         <div className="row end">
           <button disabled={busy} onClick={() => setConfirm(false)}>
-            Keep event
+            {t("Keep event")}
           </button>
           <button
             className="danger"
@@ -1013,7 +1064,9 @@ function Settings({
                 .then(finish)
             }
           >
-            {command.status === "pending" ? "Deleting…" : "Delete permanently"}
+            {command.status === "pending"
+              ? t("Deleting…")
+              : t("Delete permanently")}
           </button>
         </div>
       </Modal>

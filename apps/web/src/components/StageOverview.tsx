@@ -6,6 +6,7 @@ import {
 import { localTime } from "../lib/format";
 import { FreshnessChip } from "./Freshness";
 import type { Freshness } from "../lib/useSnapshotPoll";
+import { useI18n } from "../lib/i18n";
 
 // Presentation contract only. The current backend does not supply photos or roles.
 type StageSpeaker = Speaker & { photoUrl?: string; role?: string };
@@ -26,6 +27,7 @@ export function StageOverview({
   freshness: Freshness;
   stage?: boolean;
 }) {
+  const { t } = useI18n();
   const view = renderOperationalCue(state, nowAt);
   const speaker = state.speakers.find(
     (person) => person.id === view.current?.speakerId,
@@ -54,10 +56,10 @@ export function StageOverview({
   return (
     <section
       className={`stage-overview ${stage ? "stage-overview-dark" : ""}`}
-      aria-label="Live stage overview"
+      aria-label={t("Live stage overview")}
     >
       <div className="stage-person">
-        <span className="stage-eyebrow">ON STAGE</span>
+        <span className="stage-eyebrow">{t("ON STAGE")}</span>
         {photo ? (
           <img
             className="stage-portrait"
@@ -71,48 +73,53 @@ export function StageOverview({
         )}
         <h2>
           {speaker?.displayName ??
-            (view.current ? "Event host" : "Stage standby")}
+            (view.current ? t("Event host") : t("Stage standby"))}
         </h2>
         {speaker?.role && <p className="small muted">{speaker.role}</p>}
         {speaker?.pronunciationHint && (
           <p className="stage-pronunciation">
-            <span>Pronunciation</span>
+            <span>{t("Pronunciation")}</span>
             {speaker.pronunciationHint}
           </p>
         )}
         <span className="small muted">
-          {speaker ? "Assigned to the current cue" : "No speaker assigned"}
+          {speaker
+            ? t("Assigned to the current cue")
+            : t("No speaker assigned")}
         </span>
       </div>
       <div className="stage-activity">
         <div className="row spread">
-          <span className="stage-eyebrow">CURRENT ACTIVITY</span>
+          <span className="stage-eyebrow">{t("CURRENT ACTIVITY")}</span>
           <span className={`chip ${view.current ? "chip-ok" : "chip-info"}`}>
             {view.current
-              ? "ACTIVE"
+              ? t("ACTIVE")
               : state.phase === "ended"
-                ? "COMPLETE"
-                : "STANDBY"}
+                ? t("COMPLETE")
+                : t("STANDBY")}
           </span>
         </div>
         <h2 className="stage-cue-title">
           {view.current?.title ??
             (state.phase === "ended"
-              ? "That’s a wrap."
+              ? t("That’s a wrap.")
               : state.phase === "draft"
-                ? "Ready when you are."
-                : "Between cues")}
+                ? t("Ready when you are.")
+                : t("Between cues"))}
         </h2>
         <p className="stage-window">
           {view.current
-            ? `${view.current.startsAtLocal}–${view.current.endsAtLocal} IST · actual start / forecast end`
+            ? t("{start}–{end} IST · actual start / forecast end", {
+                start: view.current.startsAtLocal,
+                end: view.current.endsAtLocal,
+              })
             : state.phase === "draft"
-              ? "Review and publish your agenda to begin."
-              : "Waiting for the next cue."}
+              ? t("Review and publish your agenda to begin.")
+              : t("Waiting for the next cue.")}
         </p>
         {view.current && (
           <p className="small muted">
-            Planned window:{" "}
+            {t("Planned window:")}{" "}
             {localTime(
               state.startsAt,
               state.cues.find((c) => c.id === view.current?.cueId)
@@ -128,11 +135,11 @@ export function StageOverview({
           </p>
         )}
         <div className="stage-up-next">
-          <span className="stage-eyebrow">UP NEXT</span>
-          <strong>{view.next?.title ?? "Nothing further scheduled"}</strong>
+          <span className="stage-eyebrow">{t("UP NEXT")}</span>
+          <strong>{view.next?.title ?? t("Nothing further scheduled")}</strong>
           {view.next && (
             <p>
-              {nextSpeaker?.displayName ?? "Event host"}{" "}
+              {nextSpeaker?.displayName ?? t("Event host")}{" "}
               <span>· {view.next.startsAtLocal} IST</span>
             </p>
           )}
@@ -141,8 +148,8 @@ export function StageOverview({
       <div className="stage-timing">
         <span className="stage-eyebrow">
           {seconds !== null && seconds < 0
-            ? "PAST FORECAST END"
-            : "TIME REMAINING"}
+            ? t("PAST FORECAST END")
+            : t("TIME REMAINING")}
         </span>
         <div
           className={`stage-countdown ${seconds !== null && seconds < 0 ? "is-overdue" : ""}`}
@@ -152,20 +159,20 @@ export function StageOverview({
         </div>
         <p className="small muted">
           {state.mode === "rehearsal"
-            ? "Scenario clock · advances manually"
+            ? t("Scenario clock · advances manually")
             : freshness !== "live"
-              ? "Offline estimate · updates paused"
-              : "Synced to the server clock"}
+              ? t("Offline estimate · updates paused")
+              : t("Synced to the server clock")}
         </p>
         <dl className="stage-finishes">
           <div>
-            <dt>Projected finish</dt>
+            <dt>{t("Projected finish")}</dt>
             <dd>
               {view.projectedFinishLocal ?? "—"} <small>IST</small>
             </dd>
           </div>
           <div>
-            <dt>Hard finish</dt>
+            <dt>{t("Hard finish")}</dt>
             <dd>
               {localTime(state.startsAt, state.hardEndMin)} <small>IST</small>
             </dd>
