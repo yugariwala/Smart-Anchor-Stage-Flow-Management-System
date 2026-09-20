@@ -1,7 +1,9 @@
-name: CI
+name: CI / CD
 
 on:
-  # Manual-only: CI cannot consume metered runner minutes without an explicit action.
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -19,3 +21,19 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run build
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: verify
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build & Deploy to Firebase Hosting
+        run: npm run deploy:web
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
