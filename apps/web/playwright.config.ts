@@ -13,5 +13,6 @@ export default defineConfig({
     viewport: { width: 1440, height: 1000 },
     screenshot: "only-on-failure",
     trace: "off",
+    video: process.env.CUEPILOT_E2E_VIDEO === "1" ? "on" : "off",
   },
 });

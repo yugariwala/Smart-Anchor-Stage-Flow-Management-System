@@ -3,6 +3,27 @@
 Written before the recording, not during it. §25 fixes the 180-second script; this file
 records the things that will otherwise be discovered at hour 24.
 
+## Automated rehearsal capture (2026-09-20)
+
+The hosted Playwright rehearsal can record both views by setting
+`CUEPILOT_E2E_VIDEO=1`. The verified run completed without browser or console errors and
+produced:
+
+- `artifacts/cuepilot-organizer-rehearsal.webm` — 53.2 s, 800×554, 2.7 MB.
+- `artifacts/cuepilot-anchor-rehearsal.webm` — 43.16 s, 390×844, 957 KB.
+
+Playwright's FFmpeg read both files and extracted representative frames; the repair-preview
+and portrait anchor frames were visually inspected. These are silent QA walkthroughs of the
+real hosted workflow, not substitutes for the edited and narrated 180-second §25 submission.
+The `artifacts/` directory is intentionally gitignored so binary takes do not bloat the source
+repository.
+
+```sh
+CUEPILOT_E2E_VIDEO=1 \
+CUEPILOT_E2E_URL=https://smart-anchor-stage-flow-system.web.app \
+npm run test:e2e
+```
+
 ## Two pre-seeded events, not a raised cap
 
 §25 needs two scenarios: **+12** (feasible, beat 55–75 s) and **+19** (infeasible, beat

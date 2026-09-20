@@ -12,6 +12,21 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   await expect(
     page.getByRole("heading", { name: "Your events", exact: true }),
   ).toBeVisible();
+  const interfaceLanguage = page.locator("#interface-language");
+  await interfaceLanguage.selectOption("hi");
+  await expect(page.locator("html")).toHaveAttribute("lang", "hi");
+  await expect(
+    page.getByRole("link", { name: "आपके कार्यक्रम", exact: true }).first(),
+  ).toBeVisible();
+  await page.reload();
+  await expect(interfaceLanguage).toHaveValue("hi");
+  await interfaceLanguage.selectOption("gu");
+  await expect(page.locator("html")).toHaveAttribute("lang", "gu");
+  await expect(
+    page.getByRole("link", { name: "તમારા કાર્યક્રમો", exact: true }).first(),
+  ).toBeVisible();
+  await interfaceLanguage.selectOption("en");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await page.emulateMedia({ reducedMotion: "reduce" });
   expect(
     await page.evaluate(() => {
@@ -103,6 +118,14 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   const invitation = await inviteDialog.locator("p.mono").innerText();
   const anchorContext = await browser.newContext({
     viewport: { width: 390, height: 844 },
+    ...(process.env.CUEPILOT_E2E_VIDEO === "1"
+      ? {
+          recordVideo: {
+            dir: "apps/web/test-results/anchor-video",
+            size: { width: 390, height: 844 },
+          },
+        }
+      : {}),
   });
   const anchor = await anchorContext.newPage();
   await anchor.goto(invitation);

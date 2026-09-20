@@ -54,8 +54,9 @@ every hard-rule check — and the shortage quantified when no feasible plan exis
 ## Features and progress
 
 The core product, production deployment, performance sample and browser accessibility checks are
-complete. Remaining validation is native-speaker review; interface localisation remains planned.
-Next-step enhancements are listed in the [roadmap](#roadmap--planned-enhancements).
+complete. Global interface chrome supports English, Hindi and Gujarati; full page localisation
+and native-speaker review remain. Next-step enhancements are listed in the
+[roadmap](#roadmap--planned-enhancements).
 
 | # | Milestone | Progress |
 |---|---|---|
@@ -100,7 +101,7 @@ Feature-level status:
 | UX | Offline snapshot cache with the labelled stale view | Complete |
 | UX | Printable runbook (approved copy + speaker facts) | Complete |
 | UX | Accessibility polish (focus traps, live regions, non-colour cues) | Complete |
-| UX | Localised interface chrome | Planned |
+| UX | Localised interface chrome (English, Hindi, Gujarati) | Complete |
 | Quality | Domain tests on node, API tests in real `workerd`, Playwright browser e2e | Complete |
 | Deployment | Hosted frontend, authenticated Worker, production CORS and real Gemini response | Complete |
 

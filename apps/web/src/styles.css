@@ -397,6 +397,13 @@ svg {
 .topbar-right > .small {
   font-size: 10px;
 }
+.locale-select {
+  width: auto;
+  min-width: 92px;
+  height: 36px;
+  padding-block: 0;
+  font-size: 11px;
+}
 .icon-button.mobile-menu {
   display: none;
 }
@@ -1507,6 +1514,10 @@ tr.changed > * {
   }
   .topbar-right {
     gap: 7px !important;
+  }
+  .locale-select {
+    min-width: 68px;
+    max-width: 76px;
   }
   .topbar-right .avatar {
     display: none;

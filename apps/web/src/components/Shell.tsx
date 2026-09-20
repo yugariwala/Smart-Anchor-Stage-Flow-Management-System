@@ -16,14 +16,140 @@ import type { Route } from "../lib/route";
 import { Modal } from "./UI";
 
 const eventNav = [
-  ["console", "Stage console", DashboardIcon],
-  ["setup", "Event setup", CalendarIcon],
-  ["speakers", "Speakers & facts", PersonIcon],
-  ["scripts", "Host scripts", ReaderIcon],
-  ["announcements", "Announcements", SpeakerLoudIcon],
-  ["history", "Revision history", CounterClockwiseClockIcon],
-  ["settings", "Event settings", GearIcon],
+  ["console", "stageConsole", DashboardIcon],
+  ["setup", "eventSetup", CalendarIcon],
+  ["speakers", "speakersFacts", PersonIcon],
+  ["scripts", "hostScripts", ReaderIcon],
+  ["announcements", "announcements", SpeakerLoudIcon],
+  ["history", "revisionHistory", CounterClockwiseClockIcon],
+  ["settings", "eventSettings", GearIcon],
 ] as const;
+
+const locales = ["en", "hi", "gu"] as const;
+type UiLocale = (typeof locales)[number];
+const localeNames: Record<UiLocale, string> = {
+  en: "English",
+  hi: "हिन्दी",
+  gu: "ગુજરાતી",
+};
+const uiCopy = {
+  en: {
+    yourEvents: "Your events",
+    eventWorkspace: "Event workspace",
+    stageConsole: "Stage console",
+    eventSetup: "Event setup",
+    speakersFacts: "Speakers & facts",
+    hostScripts: "Host scripts",
+    announcements: "Announcements",
+    revisionHistory: "Revision history",
+    eventSettings: "Event settings",
+    anchorView: "Anchor view",
+    anchorRunbook: "Anchor runbook",
+    helpGuide: "Help & guide",
+    help: "Help",
+    signOut: "Sign out",
+    signingOut: "Signing out…",
+    yourWorkspace: "Your workspace",
+    workspace: "Workspace",
+    anonymousSession: "Anonymous session",
+    skipContent: "Skip to content",
+    stageWorkspace: "Stage workspace",
+    stageTagline: "One stage. One shared plan.",
+    mainNavigation: "Main navigation",
+    humanLed: "Human-led. Stage-ready.",
+    singleStage: "Single-stage event control",
+    openNavigation: "Open navigation",
+    interfaceLanguage: "Interface language",
+    navigateEvent: "Navigate your event.",
+    mobileNavigation: "Mobile navigation",
+    signOutTitle: "Sign out of CuePilot?",
+    signOutDescription:
+      "This is an anonymous session. Signing out loses access to events owned by this identity. There is no account recovery in this build.",
+    signOutBody:
+      "Local event shortcuts and offline snapshots will be cleared. Server data remains until you delete the event or its 72-hour expiry.",
+    keepWorking: "Keep working",
+    signOutError: "Could not sign out. Try again.",
+  },
+  hi: {
+    yourEvents: "आपके कार्यक्रम",
+    eventWorkspace: "कार्यक्रम कार्यक्षेत्र",
+    stageConsole: "मंच कंसोल",
+    eventSetup: "कार्यक्रम सेटअप",
+    speakersFacts: "वक्ता और तथ्य",
+    hostScripts: "संचालक स्क्रिप्ट्स",
+    announcements: "घोषणाएँ",
+    revisionHistory: "संशोधन इतिहास",
+    eventSettings: "कार्यक्रम सेटिंग्स",
+    anchorView: "एंकर दृश्य",
+    anchorRunbook: "एंकर रनबुक",
+    helpGuide: "सहायता और मार्गदर्शिका",
+    help: "सहायता",
+    signOut: "साइन आउट",
+    signingOut: "साइन आउट हो रहा है…",
+    yourWorkspace: "आपका कार्यक्षेत्र",
+    workspace: "कार्यक्षेत्र",
+    anonymousSession: "अनाम सत्र",
+    skipContent: "मुख्य सामग्री पर जाएँ",
+    stageWorkspace: "मंच कार्यक्षेत्र",
+    stageTagline: "एक मंच। एक साझा योजना।",
+    mainNavigation: "मुख्य नेविगेशन",
+    humanLed: "मानव-नेतृत्व। मंच के लिए तैयार।",
+    singleStage: "एकल-मंच कार्यक्रम नियंत्रण",
+    openNavigation: "नेविगेशन खोलें",
+    interfaceLanguage: "इंटरफ़ेस भाषा",
+    navigateEvent: "अपने कार्यक्रम में जाएँ।",
+    mobileNavigation: "मोबाइल नेविगेशन",
+    signOutTitle: "CuePilot से साइन आउट करें?",
+    signOutDescription:
+      "यह एक अनाम सत्र है। साइन आउट करने पर इस पहचान के कार्यक्रमों की पहुँच चली जाएगी। इस संस्करण में खाता पुनर्प्राप्ति उपलब्ध नहीं है।",
+    signOutBody:
+      "स्थानीय कार्यक्रम शॉर्टकट और ऑफ़लाइन स्नैपशॉट मिटा दिए जाएँगे। सर्वर डेटा कार्यक्रम हटाने या 72 घंटे की अवधि पूरी होने तक रहेगा।",
+    keepWorking: "काम जारी रखें",
+    signOutError: "साइन आउट नहीं हो सका। फिर प्रयास करें।",
+  },
+  gu: {
+    yourEvents: "તમારા કાર્યક્રમો",
+    eventWorkspace: "કાર્યક્રમ કાર્યક્ષેત્ર",
+    stageConsole: "મંચ કન્સોલ",
+    eventSetup: "કાર્યક્રમ સેટઅપ",
+    speakersFacts: "વક્તાઓ અને તથ્યો",
+    hostScripts: "સંચાલક સ્ક્રિપ્ટ્સ",
+    announcements: "જાહેરાતો",
+    revisionHistory: "સુધારા ઇતિહાસ",
+    eventSettings: "કાર્યક્રમ સેટિંગ્સ",
+    anchorView: "એન્કર દૃશ્ય",
+    anchorRunbook: "એન્કર રનબુક",
+    helpGuide: "સહાય અને માર્ગદર્શિકા",
+    help: "સહાય",
+    signOut: "સાઇન આઉટ",
+    signingOut: "સાઇન આઉટ થઈ રહ્યું છે…",
+    yourWorkspace: "તમારું કાર્યક્ષેત્ર",
+    workspace: "કાર્યક્ષેત્ર",
+    anonymousSession: "અનામી સત્ર",
+    skipContent: "મુખ્ય સામગ્રી પર જાઓ",
+    stageWorkspace: "મંચ કાર્યક્ષેત્ર",
+    stageTagline: "એક મંચ. એક સહિયારી યોજના.",
+    mainNavigation: "મુખ્ય નેવિગેશન",
+    humanLed: "માનવ-સંચાલિત. મંચ માટે તૈયાર.",
+    singleStage: "એકલ-મંચ કાર્યક્રમ નિયંત્રણ",
+    openNavigation: "નેવિગેશન ખોલો",
+    interfaceLanguage: "ઇન્ટરફેસ ભાષા",
+    navigateEvent: "તમારા કાર્યક્રમમાં નેવિગેટ કરો.",
+    mobileNavigation: "મોબાઇલ નેવિગેશન",
+    signOutTitle: "CuePilotમાંથી સાઇન આઉટ કરશો?",
+    signOutDescription:
+      "આ એક અનામી સત્ર છે. સાઇન આઉટ કરવાથી આ ઓળખના કાર્યક્રમોની ઍક્સેસ ગુમાવશો. આ સંસ્કરણમાં એકાઉન્ટ પુનઃપ્રાપ્તિ ઉપલબ્ધ નથી.",
+    signOutBody:
+      "સ્થાનિક કાર્યક્રમ શૉર્ટકટ્સ અને ઑફલાઇન સ્નૅપશૉટ્સ સાફ થશે. કાર્યક્રમ કાઢી નાખો અથવા 72 કલાકની મુદત પૂરી થાય ત્યાં સુધી સર્વર ડેટા રહેશે.",
+    keepWorking: "કામ ચાલુ રાખો",
+    signOutError: "સાઇન આઉટ થઈ શક્યું નહીં. ફરી પ્રયાસ કરો.",
+  },
+} as const;
+
+const readLocale = (): UiLocale => {
+  const saved = localStorage.getItem("cuepilot:ui-language");
+  return locales.find((locale) => locale === saved) ?? "en";
+};
 export function Shell({
   route,
   uid,
@@ -39,14 +165,26 @@ export function Shell({
   const [logout, setLogout] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState("");
+  const [locale, setLocale] = useState<UiLocale>(readLocale);
+  const copy = uiCopy[locale];
   const eventId =
     "eventId" in route && route.kind !== "join" && route.kind !== "anchor"
       ? route.eventId
       : null;
+  const navItem = eventNav.find((item) => item[0] === route.kind);
+  const currentPage = navItem
+    ? copy[navItem[1]]
+    : route.kind === "landing"
+      ? copy.yourEvents
+      : route.kind === "anchor"
+        ? copy.anchorRunbook
+        : copy.workspace;
   useEffect(() => {
-    document.title = `CuePilot · ${eventNav.find((item) => item[0] === route.kind)?.[1] ?? (route.kind === "landing" ? "Your events" : route.kind === "anchor" ? "Anchor runbook" : "Workspace")}`;
+    document.title = `CuePilot · ${currentPage}`;
+    document.documentElement.lang = locale;
+    localStorage.setItem("cuepilot:ui-language", locale);
     document.getElementById("main-content")?.focus();
-  }, [route.kind, eventId]);
+  }, [currentPage, eventId, locale]);
   const links = (
     <>
       <a
@@ -55,12 +193,12 @@ export function Shell({
         aria-current={route.kind === "landing" ? "page" : undefined}
       >
         <CalendarIcon />
-        Your events
+        {copy.yourEvents}
       </a>
       {eventId && (
         <>
-          <p className="nav-label">Event workspace</p>
-          {eventNav.map(([key, label, Icon]) => (
+          <p className="nav-label">{copy.eventWorkspace}</p>
+          {eventNav.map(([key, copyKey, Icon]) => (
             <a
               key={key}
               href={`#/event/${eventId}/${key}`}
@@ -68,19 +206,19 @@ export function Shell({
               aria-current={route.kind === key ? "page" : undefined}
             >
               <Icon />
-              {label}
+              {copy[copyKey]}
             </a>
           ))}
           <a className="nav-link" href={`#/anchor/${eventId}`}>
             <ArrowTopRightIcon />
-            Anchor view
+            {copy.anchorView}
           </a>
         </>
       )}
       <div className="nav-bottom">
         <a href="#/help" className="nav-link">
           <QuestionMarkCircledIcon />
-          Help & guide
+          {copy.helpGuide}
         </a>
         <button
           className="nav-link"
@@ -90,13 +228,15 @@ export function Shell({
           }}
         >
           <ExitIcon />
-          Sign out
+          {copy.signOut}
         </button>
         <div className="session-label">
           <span className="avatar">YO</span>
           <div>
-            <strong>Your workspace</strong>
-            <span>Anonymous session · {uid.slice(0, 6)}</span>
+            <strong>{copy.yourWorkspace}</strong>
+            <span>
+              {copy.anonymousSession} · {uid.slice(0, 6)}
+            </span>
           </div>
         </div>
       </div>
@@ -114,7 +254,7 @@ export function Shell({
           document.getElementById("main-content")?.focus();
         }}
       >
-        Skip to content
+        {copy.skipContent}
       </a>
       <aside className="sidebar">
         <a className="brand" href="#/">
@@ -126,14 +266,14 @@ export function Shell({
         <div className="workspace-select">
           <span className="workspace-avatar">S</span>
           <div>
-            <strong>Stage workspace</strong>
-            <small>One stage. One shared plan.</small>
+            <strong>{copy.stageWorkspace}</strong>
+            <small>{copy.stageTagline}</small>
           </div>
         </div>
-        <nav aria-label="Main navigation">{links}</nav>
+        <nav aria-label={copy.mainNavigation}>{links}</nav>
         <div className="sidebar-note">
           <span className="status-dot" />
-          Human-led. Stage-ready.
+          {copy.humanLed}
         </div>
       </aside>
       <div className="main-shell">
@@ -141,25 +281,34 @@ export function Shell({
           <button
             className="icon-button mobile-menu"
             onClick={() => setMenu(true)}
-            aria-label="Open navigation"
+            aria-label={copy.openNavigation}
           >
             <HamburgerMenuIcon />
           </button>
           <div className="breadcrumb">
             <span>CuePilot</span>
             <span>/</span>
-            <strong>
-              {eventNav.find((item) => item[0] === route.kind)?.[1] ??
-                (route.kind === "landing"
-                  ? "Your events"
-                  : route.kind === "anchor"
-                    ? "Anchor runbook"
-                    : "Workspace")}
-            </strong>
+            <strong>{currentPage}</strong>
           </div>
           <div className="row topbar-right">
-            <span className="small muted">Single-stage event control</span>
-            <a href="#/help" className="icon-button" aria-label="Help">
+            <label className="sr-only" htmlFor="interface-language">
+              {copy.interfaceLanguage}
+            </label>
+            <select
+              id="interface-language"
+              className="locale-select"
+              aria-label={copy.interfaceLanguage}
+              value={locale}
+              onChange={(event) => setLocale(event.target.value as UiLocale)}
+            >
+              {locales.map((value) => (
+                <option value={value} key={value}>
+                  {localeNames[value]}
+                </option>
+              ))}
+            </select>
+            <span className="small muted">{copy.singleStage}</span>
+            <a href="#/help" className="icon-button" aria-label={copy.help}>
               <QuestionMarkCircledIcon />
             </a>
             <span className="avatar">YO</span>
@@ -172,15 +321,15 @@ export function Shell({
       <Modal
         open={menu}
         onClose={() => setMenu(false)}
-        title="Your workspace"
-        description="Navigate your event."
+        title={copy.yourWorkspace}
+        description={copy.navigateEvent}
       >
         <nav
           className="mobile-nav"
           onClick={(e) => {
             if ((e.target as HTMLElement).closest("a")) setMenu(false);
           }}
-          aria-label="Mobile navigation"
+          aria-label={copy.mobileNavigation}
         >
           {links}
         </nav>
@@ -188,14 +337,11 @@ export function Shell({
       <Modal
         open={logout}
         onClose={() => setLogout(false)}
-        title="Sign out of CuePilot?"
-        description="This is an anonymous session. Signing out loses access to events owned by this identity. There is no account recovery in this build."
+        title={copy.signOutTitle}
+        description={copy.signOutDescription}
         busy={leaving}
       >
-        <p className="muted">
-          Local event shortcuts and offline snapshots will be cleared. Server
-          data remains until you delete the event or its 72-hour expiry.
-        </p>
+        <p className="muted">{copy.signOutBody}</p>
         {error && (
           <p role="alert" className="notice notice-bad">
             {error}
@@ -203,7 +349,7 @@ export function Shell({
         )}
         <div className="row end">
           <button disabled={leaving} onClick={() => setLogout(false)}>
-            Keep working
+            {copy.keepWorking}
           </button>
           <button
             className="danger"
@@ -211,12 +357,12 @@ export function Shell({
             onClick={() => {
               setLeaving(true);
               void onSignOut().catch(() => {
-                setError("Could not sign out. Try again.");
+                setError(copy.signOutError);
                 setLeaving(false);
               });
             }}
           >
-            {leaving ? "Signing out…" : "Sign out"}
+            {leaving ? copy.signingOut : copy.signOut}
           </button>
         </div>
       </Modal>

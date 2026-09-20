@@ -12,7 +12,7 @@ disagreement is listed at the end.
 | `npm run lint` | pass |
 | `npm run build` | pass |
 | `npm test` | **330 passed / 330**, 19 files — domain 151, api 139, web 40 |
-| `npm run test:e2e` | **1 passed**, 50.1 s (Playwright against deployed Firebase + Cloudflare) |
+| `npm run test:e2e` | **1 passed**, 52.5 s (recorded Playwright run against deployed Firebase + Cloudflare) |
 
 The API suite runs inside **real `workerd`** via `@cloudflare/vitest-pool-workers`, with real
 Durable Objects, real SQLite and a real `transactionSync`. Nothing about storage is mocked, so
@@ -134,7 +134,7 @@ an API test passing counts as "exercised on a running stack".
 | Seeded rehearsal, one click | API + web | **Verified** | `tests/api/demo-seed.test.ts`; e2e | MUST | |
 | Isolated per-judge scenario (personal event, no shared password) | API + web | **Verified** | `permissions.test.ts`; live | MUST | Anonymous identity per browser |
 | Rehearsal labelling (§11 header, verbatim) | web | **Verified** | e2e; live on every screen | MUST | |
-| Demo recording logistics written down | docs | **Implemented** | `docs/demo-script.md` | added-since | Two-event seeding plan, second-profile requirement, per-beat status |
+| Demo recording logistics + QA capture | docs | **Verified** | `docs/demo-script.md`; recorded organizer + portrait anchor hosted rehearsals | added-since | Silent verification takes exist locally; the edited/narrated 180 s submission remains a manual production task |
 
 ## Accessibility & localisation
 
@@ -147,7 +147,7 @@ an API test passing counts as "exercised on a running stack".
 | Reduced-motion respected | web | **Verified** | e2e emulates `reduce` and asserts computed animation, transition and scroll behavior | MUST | Native media emulation against the running app |
 | Mobile-portrait anchor, desktop console | web | **Verified** | e2e captures `anchor-mobile.png` at mobile viewport | MUST | |
 | Script language selection (en / hi / gu) | web | **Verified** | `script-review.test.tsx`; e2e (`Kind`, language select) | MUST | |
-| Localised **interface chrome** | web | **Not built** | — | SHOULD | Only host copy is multilingual; UI chrome is English. README lists it as Planned |
+| Localised **interface chrome** | web | **Verified** | hosted e2e checks Hindi persistence plus Hindi/Gujarati navigation and document `lang` | SHOULD | English, Hindi and Gujarati shell copy; translations are not native-reviewed |
 | Native-speaker-reviewed hi/gu sample packs | — | **Not built** | — | SHOULD | §18 forbids claiming hi/gu quality without a qualified reviewer |
 
 ## Deployment & ops
@@ -164,7 +164,7 @@ an API test passing counts as "exercised on a running stack".
 | Firebase CLI | ops | **Verified** | Firebase CLI 15.30.2; Hosting release completed | MUST | Invoked through a pinned `npx` deploy command, not a repository dependency |
 | Secret hygiene (full-history scan before every push) | ops | **Verified** | scan run before each of ~12 pushes; 189 blobs, all refs, clean | added-since | `.dev.vars`, `.env.local`, `firebase-config.txt` absent from all history |
 | Local measurements recorded | docs | **Verified** | `docs/measurements.md` | added-since | Labelled as localhost, not passed off as deployed |
-| CI pipeline | ops | **Verified** | `.github/workflows/ci.yml`; GitHub Actions run `35479081104` | added-since | Push run passed install, check and production build in 47 s |
+| CI pipeline | ops | **Verified** | `.github/workflows/ci.yml`; GitHub Actions run `35479175873` | added-since | Current Node 24 action versions passed install, check and production build in 54 s |
 
 ---
 
@@ -172,11 +172,11 @@ an API test passing counts as "exercised on a running stack".
 
 | Status | Count |
 |---|---|
-| **Verified** | 81 |
-| **Implemented** | 1 |
+| **Verified** | 83 |
+| **Implemented** | 0 |
 | **Partial** | 1 |
 | **Stubbed** | 0 |
-| **Not built** | 2 |
+| **Not built** | 1 |
 | **Cut** | 1 |
 | **Total** | 86 |
 

@@ -10,6 +10,7 @@ dist/
 !.env.example
 coverage/
 test-results/
+artifacts/
 playwright-report/
 *.local
 .DS_Store

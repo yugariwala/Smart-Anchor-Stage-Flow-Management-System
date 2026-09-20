@@ -182,6 +182,7 @@ against the local build containing the final print fixes.
 | Check | Evidence |
 |---|---|
 | Reduced motion | Chromium emulated `prefers-reduced-motion: reduce`; computed values were `animation-name: none`, `transition-duration: 0s`, `scroll-behavior: auto` |
+| Interface language | Hosted UI checked Hindi and Gujarati `lang` + navigation copy, preserved Hindi across reload, then restored English |
 | Keyboard skip path | Repeated Tab traversal reached `Skip to content`; Enter moved focus to `#main-content` |
 | Dialog focus | Escape closed the mobile navigation dialog and restored focus to its opener |
 | Print visibility | Interactive controls were hidden; complete agenda, approved host copy, pronunciation and facts were visible |
