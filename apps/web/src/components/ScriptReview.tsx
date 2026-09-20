@@ -13,6 +13,7 @@ import type { EventState } from "@cuepilot/domain";
 import { useEffect, useState } from "react";
 
 import type { ScriptDraftResponse } from "../lib/api";
+import { useI18n } from "../lib/i18n";
 
 /** §11 labels, verbatim. */
 const AI_LABEL = "AI-generated draft — human review required.";
@@ -55,6 +56,7 @@ export function ScriptReview({
   onDiscard: () => void;
   language?: "en" | "hi" | "gu";
 }) {
+  const { t } = useI18n();
   const [body, setBody] = useState(draft.body);
   const [reviewed, setReviewed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -72,11 +74,11 @@ export function ScriptReview({
   return (
     <section className="card">
       <div className="row spread">
-        <h2>Review draft</h2>
+        <h2>{t("Review draft")}</h2>
         <span
           className={`chip ${draft.source === "gemini" ? "chip-info" : "chip-warn"}`}
         >
-          {draft.source === "gemini" ? "AI draft" : "Template"}
+          {draft.source === "gemini" ? t("AI draft") : t("Template")}
         </span>
       </div>
 
@@ -96,23 +98,26 @@ export function ScriptReview({
       {/* Three observable statuses. Never a confidence score (§7B). */}
       <ul className="small" style={{ listStyle: "none", padding: 0 }}>
         <li>
-          <span className="chip chip-ok">pass</span> Schema checked
+          <span className="chip chip-ok">{t("pass")}</span>{" "}
+          {t("Schema checked")}
         </li>
         <li>
           <span className={`chip ${missingFacts ? "chip-warn" : "chip-ok"}`}>
-            {missingFacts ? "missing" : "pass"}
+            {missingFacts ? t("missing") : t("pass")}
           </span>{" "}
-          Referenced facts found ({draft.usedFactIds.length})
+          {t("Referenced facts found ({count})", {
+            count: draft.usedFactIds.length,
+          })}
         </li>
         <li>
-          <span className="chip chip-warn">pending</span> Human review{" "}
-          {edited ? "· edited" : "· unedited"}
+          <span className="chip chip-warn">{t("pending")}</span>{" "}
+          {t("Human review")} · {edited ? t("edited") : t("unedited")}
         </li>
       </ul>
 
       {draft.warnings.length > 0 && (
         <div className="notice notice-warn small" role="alert">
-          <strong>Warnings from validation</strong>
+          <strong>{t("Warnings from validation")}</strong>
           <ul>
             {draft.warnings.map((w) => (
               <li key={w}>{w}</li>
@@ -124,7 +129,7 @@ export function ScriptReview({
       <div className="script-review-grid">
         <div className="field">
           <label htmlFor="script-body">
-            Draft copy (edit before approving if needed)
+            {t("Draft copy (edit before approving if needed)")}
           </label>
           <textarea
             id="script-body"
@@ -138,13 +143,13 @@ export function ScriptReview({
             }}
           />
           <span className="small muted">
-            {body.length}/1500 characters
-            {overLength ? " — too long to approve" : ""}
+            {t("{count}/1500 characters", { count: body.length })}
+            {overLength ? ` ${t("— too long to approve")}` : ""}
           </span>
         </div>
 
         <div>
-          <h3 className="small">Source facts the model was given</h3>
+          <h3 className="small">{t("Source facts the model was given")}</h3>
           <ul className="fact-list small">
             {draft.approvedFacts.map((fact) => {
               const used = draft.usedFactIds.includes(fact.id);
@@ -152,11 +157,11 @@ export function ScriptReview({
               return (
                 <li key={fact.id}>
                   <span className={`chip ${used ? "chip-ok" : "chip-info"}`}>
-                    {used ? "used" : "unused"}
+                    {used ? t("used") : t("unused")}
                   </span>{" "}
                   {fact.text}
                   {reserved && (
-                    <span className="small muted"> · server record</span>
+                    <span className="small muted"> · {t("server record")}</span>
                   )}
                 </li>
               );
@@ -164,17 +169,18 @@ export function ScriptReview({
           </ul>
           {missingFacts && (
             <p className="notice notice-bad small" role="alert">
-              This draft references a fact that is not in the snapshot. Do not
-              approve it.
+              {t(
+                "This draft references a fact that is not in the snapshot. Do not approve it.",
+              )}
             </p>
           )}
         </div>
       </div>
 
       <p className="small muted">
-        A valid schema and resolvable fact references do not prove the copy is
-        faithful to the facts. Read the draft against the sources before
-        approving.
+        {t(
+          "A valid schema and resolvable fact references do not prove the copy is faithful to the facts. Read the draft against the sources before approving.",
+        )}
       </p>
 
       {message && (
@@ -190,12 +196,13 @@ export function ScriptReview({
           disabled={busy}
           onChange={(event) => setReviewed(event.target.checked)}
         />
-        I reviewed the words against the approved facts and checked the
-        language.
+        {t(
+          "I reviewed the words against the approved facts and checked the language.",
+        )}
       </label>
       {expired && (
         <p className="notice notice-warn" role="status">
-          This draft has expired. Discard it and generate a new one.
+          {t("This draft has expired. Discard it and generate a new one.")}
         </p>
       )}
       <div className="row">
@@ -212,10 +219,10 @@ export function ScriptReview({
           }
           onClick={() => onApprove(body, draft.usedFactIds)}
         >
-          {busy ? "Publishing…" : "Publish this script"}
+          {busy ? t("Approving…") : t("Approve and publish copy")}
         </button>
         <button type="button" onClick={onDiscard} disabled={busy}>
-          Discard draft
+          {t("Discard draft")}
         </button>
       </div>
     </section>

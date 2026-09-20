@@ -40,75 +40,22 @@ import {
   CommandNotice,
   Modal,
 } from "../components/UI";
+import { useI18n } from "../lib/i18n";
 
 const toLocal = (iso: string) =>
   new Date(Date.parse(iso) + 330 * 60_000).toISOString().slice(0, 16);
 const toIso = (local: string) =>
   new Date(local + ":00+05:30").toISOString().replace(".000Z", "Z");
-
-/** The wire format is "minutes after start"; organizers enter a clock time. */
-const offsetToClock = (startsAt: string, offsetMin: number): string => {
-  const start = Date.parse(startsAt);
-  if (!Number.isFinite(start)) return "";
-  return new Date(start + (330 + offsetMin) * 60_000)
-    .toISOString()
-    .slice(11, 16);
-};
-/**
- * Inverse of `offsetToClock`. A finish time at or before the start time is read as the
- * next day, so a late-evening event that ends after midnight still works. Out-of-range
- * results are returned unclamped — the existing draft validation is what refuses them,
- * so the UI never silently changes a number the organizer typed.
- */
-const clockToOffset = (startsAt: string, clock: string): number | null => {
-  const start = Date.parse(startsAt);
-  if (!Number.isFinite(start) || !/^\d{2}:\d{2}$/.test(clock)) return null;
-  const ist = new Date(start + 330 * 60_000);
-  const [hours, minutes] = clock.split(":").map(Number);
-  const delta =
-    (hours ?? 0) * 60 +
-    (minutes ?? 0) -
-    (ist.getUTCHours() * 60 + ist.getUTCMinutes());
-  return delta <= 0 ? delta + 1440 : delta;
-};
-/*
-  Split deliberately. A first-time organizer needs two numbers to describe a session;
-  the other four are constraints most events simply do not have, and every one of them
-  already carries a working default. Showing all eight at equal weight read as eight
-  required fields.
-*/
-const basicFields = [
-  ["preferredDurationMin", "Planned length (minutes)", 1, 60],
-  ["minDurationMin", "Shortest acceptable (minutes)", 1, 60],
-] as const;
-/** A real duration, so it stays a number of minutes. */
-const advancedFields = [
-  ["bufferBeforeMin", "Gap before this (minutes)", 0, 30],
-] as const;
-/**
- * These two are points in time, not lengths, so an organizer should give them as clock
- * times. Both are optional, and "not set" is a meaningful answer that a bare time input
- * cannot express — hence the explicit Set / Clear control beside each one.
- */
-const clockFields = [
-  [
-    "notBeforeMin",
-    "Speaker not available until",
-    "The earliest this session may begin.",
-  ],
-  [
-    "fixedStartMin",
-    "Must start exactly at",
-    "A commitment CuePilot will never move, such as a sponsor slot.",
-  ],
-] as const;
-/** The solver takes 1-100; an organizer picks an intent. */
-const PROTECTION_CHOICES = [
-  [1, "Trim this first"],
-  [20, "Normal"],
-  [60, "Keep it full length"],
+const numericFields = [
+  ["preferredDurationMin", "Preferred duration", 1, 60],
+  ["minDurationMin", "Minimum duration", 1, 60],
+  ["compressionPenalty", "Shortening priority", 1, 100],
+  ["bufferBeforeMin", "Buffer before cue", 0, 30],
+  ["notBeforeMin", "Available from minute", 0, 240],
+  ["fixedStartMin", "Fixed start minute", 0, 240],
 ] as const;
 export function SetupScreen({ eventId }: { eventId: string }) {
+  const { t } = useI18n();
   const command = useCommand();
   const [draft, setDraft] = useState<DraftBody | null>(null);
   const [mode, setMode] = useState<"rehearsal" | "live">("rehearsal");
@@ -207,25 +154,23 @@ export function SetupScreen({ eventId }: { eventId: string }) {
     return (
       <ErrorState message={loadError} retry={() => setAttempt((a) => a + 1)} />
     );
-  if (!draft) return <Loading label="Loading event setup" />;
+  if (!draft) return <Loading label={t("Loading event setup")} />;
   if (phase !== "draft")
     return (
       <div className="page">
         <PageHeading
-          title="This agenda is published"
-          description="Structural changes and speaker fact editing are available only before publication."
+          title={t("This agenda is published")}
+          description={t(
+            "Structural changes and speaker fact editing are available only before publication.",
+          )}
         />
         <a className="button-link" href={`#/event/${eventId}/console`}>
-          Return to stage console
+          {t("Return to stage console")}
           <ArrowRightIcon />
         </a>
       </div>
     );
   const busy = command.status === "pending" || command.status === "unknown";
-  const hardEndClock = offsetToClock(
-    draft.config.startsAt,
-    draft.config.hardEndMin,
-  );
   const patch = (changes: Partial<DraftBody>) => {
     setDraft({ ...draft, ...changes });
     setDirty(true);
@@ -268,7 +213,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
     } catch {
       setCsvResult({
         ok: false,
-        errors: ["That file could not be read as text."],
+        errors: [t("That file could not be read as text.")],
       });
     }
   };
@@ -328,7 +273,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
         );
     });
     if (draft.cues.length === 0)
-      errors.push("Add at least one cue to your agenda.");
+      errors.push(t("Add at least one cue to your agenda."));
     setIssues(errors);
     if (errors.length) {
       requestAnimationFrame(() =>
@@ -354,7 +299,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
         <div className="fact-input" key={fact.id}>
           <div className="field">
             <label htmlFor={`${prefix}-fact-${index}`}>
-              Approved fact {index + 1}
+              {t("Approved fact {number}", { number: index + 1 })}
             </label>
             <textarea
               id={`${prefix}-fact-${index}`}
@@ -374,7 +319,10 @@ export function SetupScreen({ eventId }: { eventId: string }) {
           <button
             type="button"
             className="icon-button"
-            aria-label={`Remove ${prefix} fact ${index + 1}`}
+            aria-label={t("Remove {prefix} fact {number}", {
+              prefix,
+              number: index + 1,
+            })}
             onClick={() => change(facts.filter((_, j) => j !== index))}
           >
             <TrashIcon />
@@ -390,7 +338,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
         }
       >
         <PlusIcon />
-        Add approved fact
+        {t("Add approved fact")}
       </button>
     </div>
   );
@@ -399,21 +347,34 @@ export function SetupScreen({ eventId }: { eventId: string }) {
       <RehearsalBanner mode={mode} />
       <div className="page">
         <PageHeading
-          title="Event setup"
-          description="Build your agenda and define the commitments your schedule must protect."
-          actions={<span className="chip chip-warn">Not published yet</span>}
+          title={t("Event setup")}
+          description={t(
+            "Build your agenda and define the commitments your schedule must protect.",
+          )}
+          actions={
+            <span className="chip chip-info">
+              {t("Draft · revision {revision}", {
+                revision: draft.expectedRevision,
+              })}
+            </span>
+          }
         />
         <form noValidate onSubmit={(event) => void save(event)}>
           <fieldset disabled={busy}>
             <div
               className="setup-tabs"
               role="group"
-              aria-label="Setup sections"
+              aria-label={t("Setup sections")}
             >
               {[
-                ["details", "Event details"],
-                ["agenda", `Agenda · ${draft.cues.length}`],
-                ["speakers", `Speakers & facts · ${draft.speakers.length}`],
+                ["details", t("Event details")],
+                ["agenda", t("Agenda · {count}", { count: draft.cues.length })],
+                [
+                  "speakers",
+                  t("Speakers & facts · {count}", {
+                    count: draft.speakers.length,
+                  }),
+                ],
               ].map(([value, label]) => (
                 <button
                   type="button"
@@ -429,11 +390,11 @@ export function SetupScreen({ eventId }: { eventId: string }) {
             <div hidden={tab !== "details"}>
               <section className="card">
                 <div className="section-title">
-                  <h2>Event details</h2>
-                  <span className="small muted">All times in IST</span>
+                  <h2>{t("Event details")}</h2>
+                  <span className="small muted">{t("All times in IST")}</span>
                 </div>
                 <div className="field">
-                  <label htmlFor="name">Event name</label>
+                  <label htmlFor="name">{t("Event name")}</label>
                   <input
                     id="name"
                     required
@@ -448,7 +409,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                 </div>
                 <div className="form-grid">
                   <div className="field">
-                    <label htmlFor="startsAt">Start date & time</label>
+                    <label htmlFor="startsAt">{t("Start date & time")}</label>
                     <input
                       id="startsAt"
                       type="datetime-local"
@@ -470,62 +431,41 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                       }
                     />
                   </div>
-                  {/*
-                    Organizers think in clock times ("we must be out by 11"), not in
-                    offsets from their own start time. The wire format is still minutes
-                    after start; the conversion happens here so nobody has to do
-                    subtraction while setting up an event.
-                  */}
                   <div className="field">
-                    <label htmlFor="hardEnd">Must finish by</label>
+                    <label htmlFor="hardEnd">
+                      {t("Hard finish (minutes after start)")}
+                    </label>
                     <input
                       id="hardEnd"
-                      type="time"
+                      type="number"
                       required
-                      value={hardEndClock}
-                      onChange={(event) => {
-                        const minutes = clockToOffset(
-                          draft.config.startsAt,
-                          event.target.value,
-                        );
-                        if (minutes !== null)
-                          patch({
-                            config: { ...draft.config, hardEndMin: minutes },
-                          });
-                      }}
+                      min={1}
+                      max={240}
+                      value={draft.config.hardEndMin}
+                      onChange={(event) =>
+                        patch({
+                          config: {
+                            ...draft.config,
+                            hardEndMin: Number(event.target.value),
+                          },
+                        })
+                      }
                     />
-                    <span className="small muted">
-                      {draft.config.hardEndMin} minutes after the start
-                    </span>
                   </div>
                 </div>
                 <p className="small muted">
-                  This is a promise you are keeping, not a rough guess —
-                  CuePilot will never publish a plan that runs past it.
+                  {t(
+                    "The hard finish is a protected commitment, not a suggested duration. Mode: {mode}.",
+                    { mode: t(mode) },
+                  )}
                 </p>
-                {/*
-                  §12 allows only name, start and finish in `config`, so mode genuinely
-                  cannot change here. Saying so plainly, and saying what it means, beats
-                  a control that could not work or a bare "Mode: rehearsal."
-                */}
-                <div className="mode-row">
-                  <span className="chip chip-info">
-                    {mode === "rehearsal" ? "Rehearsal" : "Live"}
-                  </span>
-                  <p className="small muted">
-                    {mode === "rehearsal"
-                      ? "You move the clock yourself, so you can practise the whole show in a few minutes. Anything recorded now is labelled as a rehearsal time."
-                      : "The event follows the real clock, and anything recorded now is a real time."}{" "}
-                    This was chosen when the event was created and cannot change
-                    — create another event to use the other mode.
-                  </p>
-                </div>
               </section>
               <section className="card">
-                <h2>Approved event facts</h2>
+                <h2>{t("Approved event facts")}</h2>
                 <p className="muted small">
-                  Keep names and context accurate. CuePilot only ever quotes
-                  what you put here.
+                  {t(
+                    "Keep names and context accurate. These facts are retained with their original IDs.",
+                  )}
                 </p>
                 {factsEditor(
                   draft.eventFacts,
@@ -536,14 +476,15 @@ export function SetupScreen({ eventId }: { eventId: string }) {
               {mode === "rehearsal" && (
                 <section className="fixture-callout">
                   <div>
-                    <h2>Try the fictional TechFest scenario</h2>
+                    <h2>{t("Try the fictional TechFest scenario")}</h2>
                     <p>
-                      Six sessions, three fictional speakers, a fixed sponsor
-                      start, and a 60-minute finish.
+                      {t(
+                        "Six cues, three fictional speakers, a fixed sponsor start, and a 60-minute finish.",
+                      )}
                     </p>
                   </div>
                   <button type="button" onClick={() => setFixtureOpen(true)}>
-                    Load the demo event
+                    {t("Load scenario")}
                     <ArrowRightIcon />
                   </button>
                 </section>
@@ -552,10 +493,11 @@ export function SetupScreen({ eventId }: { eventId: string }) {
             <div hidden={tab !== "agenda"}>
               <section className="section-toolbar">
                 <div>
-                  <h2>Shape the running order</h2>
+                  <h2>{t("Shape the running order")}</h2>
                   <p className="small muted">
-                    Give each item a length in whole minutes. CuePilot works out
-                    the clock times for you when you save.
+                    {t(
+                      "Times are whole-minute offsets from the event start. The server calculates the schedule when you save.",
+                    )}
                   </p>
                 </div>
                 <div className="row">
@@ -568,7 +510,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                       setCsvOpen(true);
                     }}
                   >
-                    Import CSV
+                    {t("Import CSV")}
                   </button>
                   <button
                     type="button"
@@ -594,27 +536,33 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                     }
                   >
                     <PlusIcon />
-                    Add session
+                    {t("Add cue")}
                   </button>
                 </div>
               </section>
               {!draft.cues.length && (
                 <EmptyState
-                  title="Build your running order"
-                  description="Add your opening, sessions, transitions, and closing. You can reorder them before publishing."
+                  title={t("Build your running order")}
+                  description={t(
+                    "Add your opening, sessions, transitions, and closing. You can reorder cues before publication.",
+                  )}
                 />
               )}
               {draft.cues.map((cue, index) => (
                 <section className="card cue-editor" key={cue.id}>
                   <div className="row spread">
                     <span className="cue-number">
-                      ITEM {String(index + 1).padStart(2, "0")}
+                      {t("CUE {number}", {
+                        number: String(index + 1).padStart(2, "0"),
+                      })}
                     </span>
                     <div className="row">
                       <button
                         type="button"
                         className="icon-button"
-                        aria-label={`Move cue ${index + 1} up`}
+                        aria-label={t("Move cue {number} up", {
+                          number: index + 1,
+                        })}
                         disabled={index === 0}
                         onClick={() => move(index, -1)}
                       >
@@ -623,7 +571,9 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                       <button
                         type="button"
                         className="icon-button"
-                        aria-label={`Move cue ${index + 1} down`}
+                        aria-label={t("Move cue {number} down", {
+                          number: index + 1,
+                        })}
                         disabled={index === draft.cues.length - 1}
                         onClick={() => move(index, 1)}
                       >
@@ -632,7 +582,9 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                       <button
                         type="button"
                         className="icon-button"
-                        aria-label={`Remove cue ${index + 1}`}
+                        aria-label={t("Remove cue {number}", {
+                          number: index + 1,
+                        })}
                         onClick={() =>
                           patch({
                             cues: draft.cues
@@ -647,7 +599,9 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                   </div>
                   <div className="form-grid">
                     <div className="field">
-                      <label htmlFor={`title-${cue.id}`}>Session name</label>
+                      <label htmlFor={`title-${cue.id}`}>
+                        {t("Cue title")}
+                      </label>
                       <input
                         id={`title-${cue.id}`}
                         required
@@ -659,7 +613,9 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor={`speaker-${cue.id}`}>Speaker</label>
+                      <label htmlFor={`speaker-${cue.id}`}>
+                        {t("Speaker")}
+                      </label>
                       <select
                         id={`speaker-${cue.id}`}
                         value={cue.speakerId ?? ""}
@@ -669,30 +625,44 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                           })
                         }
                       >
-                        <option value="">No assigned speaker</option>
+                        <option value="">{t("No assigned speaker")}</option>
                         {draft.speakers.map((speaker) => (
                           <option key={speaker.id} value={speaker.id}>
-                            {speaker.displayName || "Unnamed speaker"}
+                            {speaker.displayName || t("Unnamed speaker")}
                           </option>
                         ))}
                       </select>
                     </div>
                   </div>
                   <div className="constraint-grid">
-                    {basicFields.map(([field, label, min, max]) => (
+                    {numericFields.map(([field, label, min, max]) => (
                       <div className="field" key={field}>
-                        <label htmlFor={`${cue.id}-${field}`}>{label}</label>
+                        <label htmlFor={`${cue.id}-${field}`}>{t(label)}</label>
                         <input
                           id={`${cue.id}-${field}`}
                           type="number"
                           min={min}
                           max={max}
                           step={1}
-                          required
+                          required={
+                            field !== "fixedStartMin" &&
+                            field !== "notBeforeMin"
+                          }
+                          placeholder={
+                            field === "fixedStartMin" ||
+                            field === "notBeforeMin"
+                              ? t("Not set")
+                              : undefined
+                          }
                           value={cue[field] ?? ""}
                           onChange={(event) =>
                             cuePatch(index, {
-                              [field]: Number(event.target.value),
+                              [field]:
+                                event.target.value === "" &&
+                                (field === "fixedStartMin" ||
+                                  field === "notBeforeMin")
+                                  ? null
+                                  : Number(event.target.value),
                             })
                           }
                         />
@@ -700,145 +670,21 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                     ))}
                   </div>
                   <p className="small muted">
-                    The shortest acceptable length cannot be longer than the
-                    planned length.
+                    {t(
+                      "Higher shortening priority protects this cue more strongly. Minimum duration must not exceed preferred duration.",
+                    )}
                   </p>
-                  <details className="cue-advanced">
-                    <summary>Advanced timing rules</summary>
-                    <p className="small muted">
-                      These defaults suit most sessions. Change them only if
-                      this one has a real constraint — a sponsor slot at a fixed
-                      time, a speaker who arrives late, or a changeover gap.
-                    </p>
-                    <div className="field">
-                      <label htmlFor={`${cue.id}-compressionPenalty`}>
-                        If we run late
-                      </label>
-                      <select
-                        id={`${cue.id}-compressionPenalty`}
-                        value={String(cue.compressionPenalty)}
-                        onChange={(event) =>
-                          cuePatch(index, {
-                            compressionPenalty: Number(event.target.value),
-                          })
-                        }
-                      >
-                        {PROTECTION_CHOICES.map(([value, label]) => (
-                          <option key={value} value={String(value)}>
-                            {label}
-                          </option>
-                        ))}
-                        {PROTECTION_CHOICES.some(
-                          ([value]) => value === cue.compressionPenalty,
-                        ) ? null : (
-                          <option value={String(cue.compressionPenalty)}>
-                            Custom ({cue.compressionPenalty})
-                          </option>
-                        )}
-                      </select>
-                      <span className="small muted">
-                        CuePilot shortens the least protected sessions first.
-                      </span>
-                    </div>
-                    <div className="constraint-grid">
-                      {advancedFields.map(([field, label, min, max]) => (
-                        <div className="field" key={field}>
-                          <label htmlFor={`${cue.id}-${field}`}>{label}</label>
-                          <input
-                            id={`${cue.id}-${field}`}
-                            type="number"
-                            min={min}
-                            max={max}
-                            step={1}
-                            required
-                            value={cue[field]}
-                            onChange={(event) =>
-                              cuePatch(index, {
-                                [field]: Number(event.target.value),
-                              })
-                            }
-                          />
-                        </div>
-                      ))}
-                      {clockFields.map(([field, label, hint]) => {
-                        const minutes = cue[field];
-                        return (
-                          <div className="field" key={field}>
-                            <label htmlFor={`${cue.id}-${field}`}>
-                              {label}
-                            </label>
-                            <div className="clock-field">
-                              <input
-                                id={`${cue.id}-${field}`}
-                                type="time"
-                                value={
-                                  minutes === null || minutes === undefined
-                                    ? ""
-                                    : offsetToClock(
-                                        draft.config.startsAt,
-                                        minutes,
-                                      )
-                                }
-                                onChange={(event) => {
-                                  const next = clockToOffset(
-                                    draft.config.startsAt,
-                                    event.target.value,
-                                  );
-                                  cuePatch(
-                                    index,
-                                    field === "notBeforeMin"
-                                      ? { notBeforeMin: next }
-                                      : { fixedStartMin: next },
-                                  );
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  cuePatch(
-                                    index,
-                                    field === "notBeforeMin"
-                                      ? { notBeforeMin: null }
-                                      : { fixedStartMin: null },
-                                  )
-                                }
-                                disabled={
-                                  minutes === null || minutes === undefined
-                                }
-                              >
-                                Clear
-                              </button>
-                            </div>
-                            <span
-                              className={
-                                minutes !== null &&
-                                minutes !== undefined &&
-                                minutes > draft.config.hardEndMin
-                                  ? "small warn-text"
-                                  : "small muted"
-                              }
-                            >
-                              {minutes === null || minutes === undefined
-                                ? `Not set. ${hint}`
-                                : minutes > draft.config.hardEndMin
-                                  ? `${minutes} minutes after the start — that is after the event must finish. Saving will be refused.`
-                                  : `${minutes} minutes after the event starts.`}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </details>
                 </section>
               ))}
             </div>
             <div hidden={tab !== "speakers"}>
               <div className="section-toolbar">
                 <div>
-                  <h2>People behind the programme</h2>
+                  <h2>{t("People behind the programme")}</h2>
                   <p className="small muted">
-                    Add pronunciation and approved facts for the host. Up to 20
-                    speakers and ten facts per speaker.
+                    {t(
+                      "Add pronunciation and approved facts for the host. Up to 20 speakers and ten facts per speaker.",
+                    )}
                   </p>
                 </div>
                 <button
@@ -859,23 +705,27 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                   }
                 >
                   <PlusIcon />
-                  Add speaker
+                  {t("Add speaker")}
                 </button>
               </div>
               {!draft.speakers.length && (
                 <EmptyState
-                  title="Put a name to each cue"
-                  description="Add speakers, then assign them to cues in your agenda."
+                  title={t("Put a name to each cue")}
+                  description={t(
+                    "Add speakers, then assign them to cues in your agenda.",
+                  )}
                 />
               )}
               {draft.speakers.map((speaker, index) => (
                 <section className="card" key={speaker.id}>
                   <div className="section-title">
-                    <h2>Speaker {index + 1}</h2>
+                    <h2>{t("Speaker {number}", { number: index + 1 })}</h2>
                     <button
                       type="button"
                       className="icon-button"
-                      aria-label={`Remove speaker ${index + 1}`}
+                      aria-label={t("Remove speaker {number}", {
+                        number: index + 1,
+                      })}
                       onClick={() =>
                         patch({
                           speakers: draft.speakers.filter(
@@ -894,7 +744,9 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                   </div>
                   <div className="form-grid">
                     <div className="field">
-                      <label htmlFor={`name-${speaker.id}`}>Full name</label>
+                      <label htmlFor={`name-${speaker.id}`}>
+                        {t("Full name")}
+                      </label>
                       <input
                         id={`name-${speaker.id}`}
                         required
@@ -909,7 +761,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                     </div>
                     <div className="field">
                       <label htmlFor={`pronunciation-${speaker.id}`}>
-                        Pronunciation hint (optional)
+                        {t("Pronunciation hint (optional)")}
                       </label>
                       <input
                         id={`pronunciation-${speaker.id}`}
@@ -933,7 +785,8 @@ export function SetupScreen({ eventId }: { eventId: string }) {
             </div>
             <div className="save-bar">
               <span className="small muted">
-                {dirty ? "Unsaved changes" : "Saved"} · saving does not publish
+                {dirty ? t("Unsaved changes") : t("Draft loaded")} ·{" "}
+                {t("Saving does not publish")}
               </span>
               <div className="row">
                 <button
@@ -948,11 +801,13 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                     )
                   }
                 >
-                  Next section
+                  {t("Next section")}
                   <ArrowRightIcon />
                 </button>
                 <Button size="3" type="submit">
-                  {command.status === "pending" ? "Saving…" : "Save & review"}
+                  {command.status === "pending"
+                    ? t("Saving…")
+                    : t("Save & review")}
                   <ArrowRightIcon />
                 </Button>
               </div>
@@ -965,7 +820,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
               className="notice notice-bad"
               role="alert"
             >
-              <strong>Check your draft before saving</strong>
+              <strong>{t("Check your draft before saving")}</strong>
               <ul>
                 {issues.map((issue, index) => (
                   <li key={index}>{issue}</li>
@@ -986,7 +841,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                 command.reset();
               }}
             >
-              Reload latest draft (discard edits)
+              {t("Reload latest draft (discard edits)")}
             </button>
           )}
         </form>
@@ -994,15 +849,18 @@ export function SetupScreen({ eventId }: { eventId: string }) {
       <Modal
         open={fixtureOpen}
         onClose={() => setFixtureOpen(false)}
-        title="Load the fictional scenario?"
-        description="This replaces your unsaved agenda and speaker facts with the labelled TechFest rehearsal."
+        title={t("Load the fictional scenario?")}
+        description={t(
+          "This replaces your unsaved agenda and speaker facts with the labelled TechFest rehearsal.",
+        )}
       >
         <p>
-          Opening → keynote → Q&A → community → sponsor → closing. The sponsor
-          is fixed at minute 45; hard finish is minute 60.
+          {t(
+            "Opening → keynote → Q&A → community → sponsor → closing. The sponsor is fixed at minute 45; hard finish is minute 60.",
+          )}
         </p>
         <div className="row end">
-          <button onClick={() => setFixtureOpen(false)}>Cancel</button>
+          <button onClick={() => setFixtureOpen(false)}>{t("Cancel")}</button>
           <Button
             onClick={() => {
               patch({
@@ -1032,19 +890,21 @@ export function SetupScreen({ eventId }: { eventId: string }) {
               setTab("agenda");
             }}
           >
-            Load the demo event
+            {t("Load scenario")}
           </Button>
         </div>
       </Modal>
       <Modal
         open={csvOpen}
         onClose={() => setCsvOpen(false)}
-        title="Import an agenda from CSV"
-        description="Use the provided template, replace its example rows, then import. Imported cues are added to the current agenda and are not saved or published until you save the draft."
+        title={t("Import an agenda from CSV")}
+        description={t(
+          "Use the provided template, replace its example rows, then import. Imported cues are added to the current agenda and are not saved or published until you save the draft.",
+        )}
       >
         <div className="row">
           <button type="button" onClick={downloadAgendaTemplate}>
-            Download template
+            {t("Download template")}
           </button>
           <span className="small muted">
             Columns: title, speaker, preferred_duration_min, min_duration_min,
@@ -1053,7 +913,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
           </span>
         </div>
         <div className="field">
-          <label htmlFor="agenda-csv">CSV file</label>
+          <label htmlFor="agenda-csv">{t("CSV file")}</label>
           <input
             id="agenda-csv"
             type="file"
@@ -1065,10 +925,14 @@ export function SetupScreen({ eventId }: { eventId: string }) {
             }}
           />
         </div>
-        {csvFileName && <p className="small muted">Selected: {csvFileName}</p>}
+        {csvFileName && (
+          <p className="small muted">
+            {t("Selected: {file}", { file: csvFileName })}
+          </p>
+        )}
         {csvResult !== null && !csvResult.ok && (
           <div className="notice notice-bad" role="alert">
-            <strong>Fix these rows before importing</strong>
+            <strong>{t("Fix these rows before importing")}</strong>
             <ul>
               {csvResult.errors.map((error) => (
                 <li key={error}>{error}</li>
@@ -1081,19 +945,19 @@ export function SetupScreen({ eventId }: { eventId: string }) {
             <div
               className="table-scroll"
               role="region"
-              aria-label="Import preview"
+              aria-label={t("Import preview")}
               tabIndex={0}
             >
               <table>
                 <caption className="sr-only">
-                  Cues that will be added to the agenda
+                  {t("Cues that will be added to the agenda")}
                 </caption>
                 <thead>
                   <tr>
-                    <th scope="col">Cue</th>
-                    <th scope="col">Speaker</th>
+                    <th scope="col">{t("Cue")}</th>
+                    <th scope="col">{t("Speaker")}</th>
                     <th scope="col" className="num">
-                      Pref / min
+                      {t("Pref / min")}
                     </th>
                   </tr>
                 </thead>
@@ -1104,7 +968,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                       <td>
                         {[...draft.speakers, ...csvResult.newSpeakers].find(
                           (speaker) => speaker.id === cue.speakerId,
-                        )?.displayName ?? "No speaker"}
+                        )?.displayName ?? t("No speaker")}
                       </td>
                       <td className="num">
                         {cue.preferredDurationMin}/{cue.minDurationMin}
@@ -1127,7 +991,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
         )}
         <div className="row end">
           <button type="button" onClick={() => setCsvOpen(false)}>
-            Cancel
+            {t("Cancel")}
           </button>
           <Button
             type="button"
@@ -1135,19 +999,26 @@ export function SetupScreen({ eventId }: { eventId: string }) {
             onClick={applyAgendaImport}
           >
             {csvResult !== null && csvResult.ok
-              ? `Add ${csvResult.cues.length} item${csvResult.cues.length === 1 ? "" : "s"}`
-              : "Add items"}
+              ? t(
+                  csvResult.cues.length === 1
+                    ? "Add {count} cue"
+                    : "Add {count} cues",
+                  { count: csvResult.cues.length },
+                )
+              : t("Add cues")}
           </Button>
         </div>
       </Modal>
       <Modal
         open={leaveOpen}
         onClose={() => setLeaveOpen(false)}
-        title="Leave your unsaved draft?"
-        description="Your edits have not been saved to the event."
+        title={t("Leave your unsaved draft?")}
+        description={t("Your edits have not been saved to the event.")}
       >
         <div className="row end">
-          <button onClick={() => setLeaveOpen(false)}>Keep editing</button>
+          <button onClick={() => setLeaveOpen(false)}>
+            {t("Keep editing")}
+          </button>
           <button
             className="danger"
             onClick={() => {
@@ -1156,7 +1027,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
               navigate(leaveTarget);
             }}
           >
-            Discard & leave
+            {t("Discard & leave")}
           </button>
         </div>
       </Modal>

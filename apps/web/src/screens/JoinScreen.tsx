@@ -3,7 +3,9 @@ import { joinEvent } from "../lib/api";
 import { consumeInviteCode, navigate } from "../lib/route";
 import { useCommand } from "../lib/useCommand";
 import { CommandNotice, EmptyState } from "../components/UI";
+import { useI18n } from "../lib/i18n";
 export function JoinScreen({ eventId }: { eventId: string }) {
+  const { t } = useI18n();
   const command = useCommand();
   const { run } = command;
   const code = useRef<string | null | undefined>(undefined);
@@ -28,21 +30,25 @@ export function JoinScreen({ eventId }: { eventId: string }) {
       <EmptyState
         title={
           missing
-            ? "This invitation is incomplete"
+            ? t("This invitation is incomplete")
             : command.status === "failed"
-              ? "This invitation could not be accepted"
-              : "Connecting you to the stage"
+              ? t("This invitation could not be accepted")
+              : t("Connecting you to the stage")
         }
         description={
           missing
-            ? "The link has no invitation code. Ask your organizer for a new link."
+            ? t(
+                "The link has no invitation code. Ask your organizer for a new link.",
+              )
             : command.status === "pending"
-              ? "Accepting your private invitation…"
-              : "Invitations are single-use and expire after one hour. Your organizer can create a new invitation."
+              ? t("Accepting your private invitation…")
+              : t(
+                  "Invitations are single-use and expire after one hour. Your organizer can create a new invitation.",
+                )
         }
         action={
           <a className="button-link" href="#/">
-            Back to your events
+            {t("Back to your events")}
           </a>
         }
       />

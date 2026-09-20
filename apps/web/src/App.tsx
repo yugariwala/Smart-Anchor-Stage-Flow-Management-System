@@ -5,6 +5,7 @@ import { signIn, signOut, watchUser } from "./lib/auth";
 import { missingConfig } from "./lib/env";
 import { useRoute, navigate } from "./lib/route";
 import { clearLocalData, setStorageIdentity } from "./lib/storage";
+import { useI18n } from "./lib/i18n";
 import { Shell } from "./components/Shell";
 import { EmptyState, ErrorBoundary, Loading } from "./components/UI";
 const AnchorView = lazy(() =>
@@ -40,6 +41,7 @@ const Help = lazy(() =>
 );
 
 export function App() {
+  const { t } = useI18n();
   const route = useRoute();
   const [uid, setUid] = useState<string | null>(null);
   const [authError, setAuthError] = useState("");
@@ -89,13 +91,14 @@ export function App() {
           <a className="brand" href="#/">
             CuePilot<span className="brand-beta">SETUP</span>
           </a>
-          <h1>Connect your workspace.</h1>
+          <h1>{t("Connect your workspace.")}</h1>
           <p className="muted">
-            Firebase and API configuration are required before your event data
-            can load.
+            {t(
+              "Firebase and API configuration are required before your event data can load.",
+            )}
           </p>
           <div className="notice notice-warn">
-            <strong>Missing public configuration</strong>
+            <strong>{t("Missing public configuration")}</strong>
             <ul>
               {missingConfig.map((name) => (
                 <li className="mono small" key={name}>
@@ -105,50 +108,25 @@ export function App() {
             </ul>
           </div>
           <p>
-            Copy <code>apps/web/.env.example</code> to{" "}
-            <code>apps/web/.env.local</code>, enter your project values, then
-            restart Vite.
+            {t(
+              "Copy apps/web/.env.example to apps/web/.env.local, enter your project values, then restart Vite.",
+            )}
           </p>
           <p className="small muted">
-            Enable Firebase anonymous authentication and authorize this domain.
-            Server secrets do not belong in frontend configuration.
+            {t(
+              "Enable Firebase anonymous authentication and authorize this domain. Server secrets do not belong in frontend configuration.",
+            )}
           </p>
           <button onClick={() => window.location.reload()}>
-            Check configuration again
+            {t("Check configuration again")}
           </button>
         </div>
       </div>
     );
-  /*
-    Anonymous sign-in costs a network round trip — measured at ~3.7 s cold on the
-    deployed app. It cannot be skipped, but it does not have to be blank: a first-time
-    visitor was previously shown three grey boxes and the words "Restoring your secure
-    session", which is doubly wrong for someone who has never had one. The wait now
-    carries the same explanation the landing page would have given them.
-  */
   if (loading)
     return (
       <div className="auth-page">
-        <div className="auth-card">
-          <span className="brand">CuePilot</span>
-          <h1>Keep the show moving together.</h1>
-          <p className="muted">
-            Prepare your rundown, protect your timing, and keep your anchor on
-            the same page.
-          </p>
-          <ol className="small muted intro-steps">
-            <li>
-              <strong>Prepare</strong> — every session in its place
-            </li>
-            <li>
-              <strong>Publish</strong> — one approved runbook
-            </li>
-            <li>
-              <strong>Perform</strong> — everyone on the same page
-            </li>
-          </ol>
-          <Loading label="Setting up your workspace" />
-        </div>
+        <Loading label={t("Restoring your secure session")} />
       </div>
     );
   if (!uid)
@@ -156,11 +134,17 @@ export function App() {
       <div className="auth-page">
         <div className="auth-card">
           <span className="brand">CuePilot</span>
-          <h1>{signedOut ? "You’re signed out." : "Your stage awaits."}</h1>
+          <h1>
+            {signedOut ? t("You’re signed out.") : t("Your stage awaits.")}
+          </h1>
           <p className="muted">
             {signedOut
-              ? "Local event shortcuts and offline snapshots have been cleared."
-              : "Continue with an anonymous browser identity to create or join an event."}
+              ? t(
+                  "Local event shortcuts and offline snapshots have been cleared.",
+                )
+              : t(
+                  "Continue with an anonymous browser identity to create or join an event.",
+                )}
           </p>
           {authError && (
             <p className="notice notice-bad" role="alert">
@@ -168,11 +152,12 @@ export function App() {
             </p>
           )}
           <Button size="3" onClick={() => void login()}>
-            {authError ? "Retry sign-in" : "Start a new session"}
+            {authError ? t("Retry sign-in") : t("Start a new session")}
           </Button>
           <p className="small muted">
-            Anonymous sessions cannot be recovered after sign-out. No email or
-            password is required.
+            {t(
+              "Anonymous sessions cannot be recovered after sign-out. No email or password is required.",
+            )}
           </p>
         </div>
       </div>
@@ -206,11 +191,13 @@ export function App() {
       content = (
         <div className="page">
           <EmptyState
-            title="Your session is active"
-            description="You’re using an anonymous browser identity. Use Sign out in navigation to leave this workspace."
+            title={t("Your session is active")}
+            description={t(
+              "You’re using an anonymous browser identity. Use Sign out in navigation to leave this workspace.",
+            )}
             action={
               <a className="button-link" href="#/">
-                Go to your events
+                {t("Go to your events")}
               </a>
             }
           />
@@ -221,11 +208,13 @@ export function App() {
       content = (
         <div className="page">
           <EmptyState
-            title="We couldn’t find that page."
-            description="The link may be incomplete. Return to your workspace or open an invitation from your organizer."
+            title={t("We couldn’t find that page.")}
+            description={t(
+              "The link may be incomplete. Return to your workspace or open an invitation from your organizer.",
+            )}
             action={
               <a className="button-link" href="#/">
-                Back to your events
+                {t("Back to your events")}
               </a>
             }
           />
@@ -238,7 +227,7 @@ export function App() {
   return (
     <Shell route={route} uid={uid} onSignOut={logout}>
       <ErrorBoundary key={key}>
-        <Suspense fallback={<Loading label="Opening page" />}>
+        <Suspense fallback={<Loading label={t("Opening page")} />}>
           {content}
         </Suspense>
       </ErrorBoundary>

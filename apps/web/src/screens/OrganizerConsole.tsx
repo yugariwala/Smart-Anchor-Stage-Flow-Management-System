@@ -48,6 +48,7 @@ import { RepairPreviewPanel } from "../components/RepairPreview";
 import { StageOverview } from "../components/StageOverview";
 import { ReadinessReminder } from "../components/ReadinessReminder";
 import { Modal, CommandNotice, Loading, PageHeading } from "../components/UI";
+import { useI18n } from "../lib/i18n";
 
 const ACK_POLL_MS = 10_000;
 
@@ -58,6 +59,7 @@ export function OrganizerConsole({
   eventId: string;
   uid: string;
 }) {
+  const { t } = useI18n();
   const poll = useSnapshotPoll(eventId);
   const command = useCommand();
   const [envelope, setEnvelope] = useState<EventEnvelope | null>(null);
@@ -74,21 +76,6 @@ export function OrganizerConsole({
   const [releaseMinute, setReleaseMinute] = useState("");
   const [publishOpen, setPublishOpen] = useState(false);
   const [keynoteOpen, setKeynoteOpen] = useState(false);
-  /*
-    A successful mutation used to end in silence: the pending banner vanished and the
-    screen simply stopped moving, which reads as "did that work?". This says what landed,
-    then clears itself so it never becomes stale furniture.
-  */
-  const [confirmation, setConfirmation] = useState("");
-  /*
-    Reassurance should arrive, not be looked up. The ack poll is separate from the
-    revision stream, so this watches it for a version the organizer has not been told
-    about yet and announces it once.
-  */
-  const ackBaseline = useRef<{ ready: boolean; value: number | null }>({
-    ready: false,
-    value: null,
-  });
   const lastEnvelopeRevision = useRef<number | null>(null);
 
   const reload = useCallback(async (): Promise<void> => {
@@ -133,38 +120,6 @@ export function OrganizerConsole({
     return () => window.clearInterval(id);
   }, [reload]);
 
-  useEffect(() => {
-    if (confirmation === "") return;
-    const id = window.setTimeout(() => setConfirmation(""), 8000);
-    return () => window.clearTimeout(id);
-  }, [confirmation]);
-
-  const ackedRevision =
-    envelope?.publishedRevision == null
-      ? null
-      : (envelope.acknowledgments ?? []).some(
-            (a) => a.revision === envelope.publishedRevision,
-          )
-        ? envelope.publishedRevision
-        : null;
-  useEffect(() => {
-    // Nothing has loaded yet, so there is no baseline to compare against.
-    if (envelope === null) return;
-    // Whatever was already acknowledged when this screen opened is not news. Recording
-    // it as the baseline — even when that is "nothing" — is what lets the FIRST real
-    // acknowledgement still announce itself.
-    if (!ackBaseline.current.ready) {
-      ackBaseline.current = { ready: true, value: ackedRevision };
-      return;
-    }
-    if (ackedRevision === null || ackedRevision === ackBaseline.current.value) {
-      return;
-    }
-    ackBaseline.current.value = ackedRevision;
-    // oxlint-disable-next-line react/set-state-in-effect
-    setConfirmation(`Your anchor has version ${ackedRevision}.`);
-  }, [envelope, ackedRevision]);
-
   const state = envelope?.state ?? null;
 
   const view = useMemo(() => {
@@ -179,16 +134,16 @@ export function OrganizerConsole({
   if (state === null || view === null) {
     return (
       <div className="page">
-        <h1>Organizer console</h1>
+        <h1>{t("Organizer console")}</h1>
         {loadError === "" ? (
-          <Loading label="Loading stage console" />
+          <Loading label={t("Loading stage console")} />
         ) : (
           <>
             <p className="notice notice-bad" role="alert">
               {loadError}
             </p>
             <button type="button" onClick={() => navigate("#/")}>
-              Back to start
+              {t("Back to start")}
             </button>
           </>
         )}
@@ -228,9 +183,6 @@ export function OrganizerConsole({
     );
     if (result) {
       setPublishOpen(false);
-      setConfirmation(
-        "Published. Your anchor's screen now shows this runbook.",
-      );
       await reload();
       poll.refresh();
     }
@@ -342,13 +294,6 @@ export function OrganizerConsole({
       ),
     );
     if (result !== null) {
-      setConfirmation(
-        `New plan published. Your anchor's screen now shows it${
-          proposal.result.projectedFinishMin === null
-            ? ""
-            : `, finishing at ${localTime(state.startsAt, proposal.result.projectedFinishMin)}`
-        }.`,
-      );
       setProposal(null);
       await reload();
       poll.refresh();
@@ -378,12 +323,14 @@ export function OrganizerConsole({
       <div className="page">
         <PageHeading
           title={state.name}
-          description="Stage console · Every cue and every change in one place."
+          description={t(
+            "Stage console · Every cue and every change in one place.",
+          )}
           actions={
             <>
               <button
                 className="icon-button"
-                aria-label="Refresh console"
+                aria-label={t("Refresh console")}
                 onClick={() => {
                   void reload();
                   poll.refresh();
@@ -392,44 +339,36 @@ export function OrganizerConsole({
                 <ReloadIcon />
               </button>
               <a className="button-link" href={`#/anchor/${eventId}`}>
-                Anchor view
+                {t("Anchor view")}
                 <ArrowTopRightIcon />
               </a>
             </>
           }
         />
-        {/*
-          One publication status, never two. Showing the poll freshness ("Live") beside
-          the draft phase read as a contradiction: the organizer could not tell whether
-          her anchor could already see the runbook. Before publication there is nothing
-          to be fresh about, so the freshness chip is simply not the right answer yet.
-        */}
         <div className="row spread">
           <div className="row">
-            {envelope?.publishedRevision == null ? (
-              <span className="chip chip-warn">
-                Draft — not visible to your anchor yet
-              </span>
-            ) : (
-              <FreshnessChip
-                freshness={poll.freshness}
-                revision={envelope.publishedRevision}
-              />
-            )}
+            <FreshnessChip
+              freshness={poll.freshness}
+              revision={envelope?.publishedRevision ?? null}
+            />
+            <span className="chip chip-info">
+              {t("revision {revision}", { revision })}
+            </span>
             <span
               className={`chip ${state.scheduleHealth === "valid" ? "chip-ok" : "chip-warn"}`}
             >
               {state.scheduleHealth === "valid"
-                ? "Timing looks good"
-                : "Timing needs fixing"}
+                ? t("Schedule valid")
+                : t("Needs repair")}
             </span>
+            <span className="chip chip-info">{t(state.phase)}</span>
           </div>
         </div>
 
         <div className="console-metrics">
           <div>
             <ClockIcon />
-            <span>Event clock</span>
+            <span>{t("Event clock")}</span>
             <strong>
               {state.scenarioNowAt
                 ? localTimeOf(state.startsAt, state.scenarioNowAt)
@@ -439,7 +378,7 @@ export function OrganizerConsole({
           </div>
           <div>
             <CheckCircledIcon />
-            <span>Sessions done</span>
+            <span>{t("Cues completed")}</span>
             <strong>
               {ordered.filter((c) => c.status === "completed").length}
               <small> / {ordered.length}</small>
@@ -447,7 +386,7 @@ export function OrganizerConsole({
           </div>
           <div>
             <ClockIcon />
-            <span>Must finish by</span>
+            <span>{t("Hard finish")}</span>
             <strong>
               {localTime(state.startsAt, state.hardEndMin)}
               <small> IST</small>
@@ -455,9 +394,9 @@ export function OrganizerConsole({
           </div>
           <div>
             <PersonIcon />
-            <span>Anchor</span>
+            <span>{t("Anchor handoff")}</span>
             <strong className="metric-word">
-              {currentAck ? "Confirmed" : "Not confirmed yet"}
+              {currentAck ? t("Received") : t("Awaiting ack")}
             </strong>
           </div>
         </div>
@@ -500,30 +439,28 @@ export function OrganizerConsole({
         />
         {loadError && (
           <p className="notice notice-bad" role="alert">
-            {loadError} <button onClick={() => void reload()}>Reconnect</button>
+            {loadError}{" "}
+            <button onClick={() => void reload()}>{t("Reconnect")}</button>
           </p>
         )}
         {command.status === "pending" ? (
           <p className="notice notice-warn" role="alert">
-            Saving your change…
-          </p>
-        ) : null}
-        {command.status !== "pending" && confirmation !== "" ? (
-          <p className="notice notice-ok" role="status">
-            {confirmation}
+            {t("Waiting for the server to confirm this action…")}
           </p>
         ) : null}
 
         <p className="sr-only" aria-live="polite">
           {envelope?.publishedRevision
-            ? `Published runbook revision ${envelope.publishedRevision}.`
-            : "Draft runbook. Not yet published."}
+            ? t("Published runbook revision {revision}.", {
+                revision: envelope.publishedRevision,
+              })
+            : t("Draft runbook. Not yet published.")}
         </p>
         <StageOverview
           state={state}
           nowAt={state.scenarioNowAt ?? poll.serverNowIso}
+          revision={envelope?.publishedRevision ?? null}
           freshness={poll.freshness}
-          lastSyncAt={poll.lastSyncAt}
         />
         {envelope?.publishedRevision !== null && (
           <ReadinessReminder
@@ -544,23 +481,26 @@ export function OrganizerConsole({
         <div className="console-grid">
           <div>
             <div className="card">
-              <h2>Agenda</h2>
+              <h2>{t("Agenda")}</h2>
               <div
                 className="table-scroll"
                 role="region"
-                aria-label="Event agenda"
+                aria-label={t("Event agenda")}
                 tabIndex={0}
               >
                 <table>
                   <thead>
                     <tr>
-                      <th scope="col">Session</th>
-                      <th scope="col">Planned</th>
-                      <th scope="col">Actual / expected</th>
+                      <th scope="col">{t("Cue")}</th>
+                      <th scope="col">{t("Planned")}</th>
+                      <th scope="col">{t("Actual / forecast")}</th>
                       <th scope="col" className="num">
-                        Rules
+                        {t("Pref / min")}
                       </th>
-                      <th scope="col">Status</th>
+                      <th scope="col" className="num">
+                        {t("Rules")}
+                      </th>
+                      <th scope="col">{t("Status")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -589,33 +529,46 @@ export function OrganizerConsole({
                                   ? localTimeOf(state.startsAt, cue.actualEndAt)
                                   : state.activeForecastEndMin !== null &&
                                       cue.status === "active"
-                                    ? `${localTime(state.startsAt, state.activeForecastEndMin)} (forecast)`
+                                    ? `${localTime(state.startsAt, state.activeForecastEndMin)} (${t("forecast")})`
                                     : "…"
                               }`}
                           {cue.actualTimeSource === "rehearsal_clock" ? (
                             <span className="small muted">
                               {" "}
-                              rehearsal clock
+                              {t("rehearsal clock")}
                             </span>
                           ) : cue.actualTimeSource === "server_clock" ? (
-                            <span className="small muted"> server clock</span>
+                            <span className="small muted">
+                              {" "}
+                              {t("server clock")}
+                            </span>
                           ) : null}
                         </td>
-                        {/*
-                          Planned / shortest lengths were dropped from this table: during a
-                          running event the organizer is not making compression decisions,
-                          and the recovery dialog shows them where they matter.
-                        */}
+                        <td className="num">
+                          {cue.preferredDurationMin}/{cue.minDurationMin}
+                        </td>
                         <td className="num small">
                           {cue.fixedStartMin !== null
-                            ? `fixed ${localTime(state.startsAt, cue.fixedStartMin)}`
+                            ? t("fixed {time}", {
+                                time: localTime(
+                                  state.startsAt,
+                                  cue.fixedStartMin,
+                                ),
+                              })
                             : cue.notBeforeMin !== null
-                              ? `from ${localTime(state.startsAt, cue.notBeforeMin)}`
+                              ? t("from {time}", {
+                                  time: localTime(
+                                    state.startsAt,
+                                    cue.notBeforeMin,
+                                  ),
+                                })
                               : cue.bufferBeforeMin > 0
-                                ? `buffer ${cue.bufferBeforeMin}`
+                                ? t("buffer {minutes}", {
+                                    minutes: cue.bufferBeforeMin,
+                                  })
                                 : "—"}
                         </td>
-                        <td>{cue.status}</td>
+                        <td>{t(cue.status)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -623,8 +576,9 @@ export function OrganizerConsole({
               </div>
               {state.cues.length === 0 ? (
                 <p className="muted small">
-                  No cues yet. Add the agenda on the setup screen before
-                  publishing.
+                  {t(
+                    "No cues yet. Add the agenda on the setup screen before publishing.",
+                  )}
                 </p>
               ) : null}
             </div>
@@ -633,12 +587,11 @@ export function OrganizerConsole({
           <div>
             {rehearsalSteps.length > 0 ? (
               <div className="card">
-                <h2>Seeded rehearsal</h2>
+                <h2>{t("Seeded rehearsal")}</h2>
                 <p className="small muted">
-                  This is the labeled fictional TechFest scenario. The action
-                  below publishes it and advances the opening so the keynote is
-                  active, using the normal stage commands — the same buttons a
-                  person would click.
+                  {t(
+                    "This is the labeled fictional TechFest scenario. The action below publishes it and advances the opening so the keynote is active, using the normal stage commands — the same buttons a person would click.",
+                  )}
                 </p>
                 <button
                   type="button"
@@ -646,23 +599,24 @@ export function OrganizerConsole({
                   onClick={() => setKeynoteOpen(true)}
                   disabled={readOnly}
                 >
-                  Load rehearsal at keynote
+                  {t("Load rehearsal at keynote")}
                 </button>
               </div>
             ) : null}
             {state.phase === "draft" ? (
               <div className="card">
-                <h2>Publish the runbook</h2>
+                <h2>{t("Publish the runbook")}</h2>
                 <p className="small muted">
-                  Publishing validates the full draft and makes it visible to
-                  anchors. It does not start the first cue.
+                  {t(
+                    "Publishing validates the full draft and makes it visible to anchors. It does not start the first cue.",
+                  )}
                 </p>
                 <div className="row">
                   <button
                     type="button"
                     onClick={() => navigate(`#/event/${eventId}/setup`)}
                   >
-                    Edit agenda
+                    {t("Edit agenda")}
                   </button>
                   <button
                     type="button"
@@ -670,7 +624,7 @@ export function OrganizerConsole({
                     onClick={() => setPublishOpen(true)}
                     disabled={readOnly || state.cues.length === 0}
                   >
-                    {busy ? "Publishing…" : "Check and publish"}
+                    {busy ? t("Publishing…") : t("Validate and publish")}
                   </button>
                 </div>
               </div>
@@ -679,7 +633,7 @@ export function OrganizerConsole({
             {state.phase === "running" ? (
               <>
                 <div className="card">
-                  <h2>Run the stage</h2>
+                  <h2>{t("Run the stage")}</h2>
                   <div className="row">
                     {activeCue === null ? (
                       <button
@@ -691,8 +645,8 @@ export function OrganizerConsole({
                         disabled={readOnly || firstPending === null}
                       >
                         {firstPending === null
-                          ? "No cues left"
-                          : `Start ${firstPending.title}`}
+                          ? t("No cues left")
+                          : t("Start {cue}", { cue: firstPending.title })}
                       </button>
                     ) : (
                       <button
@@ -701,25 +655,18 @@ export function OrganizerConsole({
                         onClick={() => void onComplete(activeCue.id)}
                         disabled={readOnly}
                       >
-                        Complete {activeCue.title}
+                        {t("Complete {cue}", { cue: activeCue.title })}
                       </button>
                     )}
                   </div>
                   {state.mode === "rehearsal" ? (
                     <>
-                      <h3 className="small">Scenario clock</h3>
-                      {/*
-                        Read once, then never again — but it was making the rail taller
-                        than the agenda beside it on every single view.
-                      */}
-                      <details className="small muted rail-aside">
-                        <summary>What is this?</summary>
-                        <p>
-                          A practice clock you move yourself. It only ever goes
-                          forward, and anything recorded while it is running is
-                          labelled as a rehearsal time.
-                        </p>
-                      </details>
+                      <h3 className="small">{t("Scenario clock")}</h3>
+                      <p className="small muted">
+                        {t(
+                          "The scenario clock advances only forward. Actual times recorded while it is in use are labelled as rehearsal-clock times.",
+                        )}
+                      </p>
                       <div className="row">
                         {[1, 5, 10].map((n) => (
                           <button
@@ -728,7 +675,7 @@ export function OrganizerConsole({
                             onClick={() => void advanceClock(n)}
                             disabled={readOnly}
                           >
-                            +{n} min
+                            {t("+{minutes} min", { minutes: n })}
                           </button>
                         ))}
                       </div>
@@ -736,31 +683,33 @@ export function OrganizerConsole({
                   ) : null}
                 </div>
 
-                {/*
-                  While the event is running this is the urgent control, so it leads
-                  the rail. It previously sat below the rehearsal-clock buttons, which
-                  are demo-only, and an organizer under pressure had to scroll past
-                  them to reach it.
-                */}
-                <div className="card card-priority">
-                  <h2>Running late?</h2>
+                <div className="card">
+                  <h2>{t("Report an overrun")}</h2>
                   {activeCue === null ? (
                     <p className="small muted">
-                      You can plan a recovery between sessions too. With nothing
-                      on stage, the plan is rebuilt from the time now.
+                      {t(
+                        "A repair can be previewed between cues as well; with no active cue the plan is rebuilt from the current scenario minute.",
+                      )}
                     </p>
                   ) : (
                     <p className="small muted">
-                      {activeCue.title} was due to end at{" "}
-                      {state.activeForecastEndMin === null
-                        ? "—"
-                        : localTime(state.startsAt, state.activeForecastEndMin)}
-                      . Tell us how many minutes late it will run — entering it
-                      again replaces the last estimate, it never adds to it.
+                      {t(
+                        "{cue} currently forecasts {time}. Entering a delay sends a new absolute forecast end, so re-previewing never stacks the delay.",
+                        {
+                          cue: activeCue.title,
+                          time:
+                            state.activeForecastEndMin === null
+                              ? "—"
+                              : localTime(
+                                  state.startsAt,
+                                  state.activeForecastEndMin,
+                                ),
+                        },
+                      )}
                     </p>
                   )}
                   <div className="field">
-                    <label htmlFor="delay">Minutes late</label>
+                    <label htmlFor="delay">{t("Delay in minutes")}</label>
                     <input
                       id="delay"
                       type="number"
@@ -775,26 +724,27 @@ export function OrganizerConsole({
                     {state.activeForecastEndMin !== null &&
                     Number.isInteger(Number(delayMinutes)) ? (
                       <span className="small muted">
-                        New forecast end{" "}
-                        {localTime(
-                          state.startsAt,
-                          state.activeForecastEndMin + Number(delayMinutes),
-                        )}{" "}
-                        ({signedMinutes(Number(delayMinutes))} min)
+                        {t("New forecast end {time} ({minutes} min)", {
+                          time: localTime(
+                            state.startsAt,
+                            state.activeForecastEndMin + Number(delayMinutes),
+                          ),
+                          minutes: signedMinutes(Number(delayMinutes)),
+                        })}
                       </span>
                     ) : null}
                   </div>
                   <details className="release-controls">
-                    <summary>Speaker arriving late?</summary>
+                    <summary>{t("Speaker arriving late?")}</summary>
                     <div className="field">
-                      <label htmlFor="releaseCue">Pending cue</label>
+                      <label htmlFor="releaseCue">{t("Pending cue")}</label>
                       <select
                         id="releaseCue"
                         value={releaseCue}
                         onChange={(e) => setReleaseCue(e.target.value)}
                         disabled={readOnly}
                       >
-                        <option value="">No availability update</option>
+                        <option value="">{t("No availability update")}</option>
                         {ordered
                           .filter((c) => c.status === "pending")
                           .map((c) => (
@@ -807,7 +757,7 @@ export function OrganizerConsole({
                     {releaseCue && (
                       <div className="field">
                         <label htmlFor="releaseMinute">
-                          Available from minute after start
+                          {t("Available from minute after start")}
                         </label>
                         <input
                           id="releaseMinute"
@@ -839,30 +789,22 @@ export function OrganizerConsole({
                           Number(releaseMinute) > 240))
                     }
                   >
-                    {busy ? "Calculating…" : "Preview recovery plan"}
+                    {busy ? t("Calculating…") : t("Preview recovery plan")}
                   </button>
                 </div>
               </>
             ) : null}
 
             <div className="card">
-              <h2>Anchor</h2>
+              <h2>{t("Anchor")}</h2>
               <p className="small muted">
-                {envelope?.publishedRevision == null ? (
-                  <strong>Not published yet</strong>
-                ) : (
-                  <>
-                    Published version{" "}
-                    <strong>{envelope.publishedRevision}</strong>
-                  </>
-                )}
+                {t("Published revision")}{" "}
+                <strong>
+                  {envelope?.publishedRevision ?? t("not published")}
+                </strong>
               </p>
               {acks.length === 0 ? (
-                <p className="small muted">
-                  {envelope?.publishedRevision == null
-                    ? "Invite your anchor once you have published."
-                    : "Your anchor has not opened this update yet."}
-                </p>
+                <p className="small muted">{t("No acknowledgements yet.")}</p>
               ) : (
                 <ul className="small">
                   {acks.map((a) => (
@@ -875,19 +817,25 @@ export function OrganizerConsole({
                         }`}
                       >
                         {a.revision === envelope?.publishedRevision
-                          ? "current"
-                          : "behind"}
+                          ? t("current")
+                          : t("behind")}
                       </span>{" "}
-                      version {a.revision} at{" "}
-                      {new Date(a.acknowledgedAt).toLocaleTimeString()}
+                      {t("revision {revision} at {time}", {
+                        revision: a.revision,
+                        time: new Date(a.acknowledgedAt).toLocaleTimeString(),
+                      })}
                     </li>
                   ))}
                 </ul>
               )}
               <p className="small muted">
                 {currentAck === undefined
-                  ? "Publishing and confirming are separate — your anchor may not have opened this update yet."
-                  : "Your anchor has confirmed receiving this update. That is not confirmation the words were spoken."}
+                  ? t(
+                      "Publication success and acknowledgement are separate: the anchor may not have seen this revision yet.",
+                    )
+                  : t(
+                      "The anchor has acknowledged receiving this revision. That is not confirmation the words were spoken.",
+                    )}
               </p>
               <div className="row">
                 <button
@@ -895,52 +843,58 @@ export function OrganizerConsole({
                   onClick={() => void onInvite()}
                   disabled={readOnly}
                 >
-                  Invite an anchor
+                  {t("Invite an anchor")}
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate(`#/anchor/${eventId}`)}
                 >
-                  Preview anchor view
+                  {t("Preview anchor view")}
                 </button>
               </div>
               {invite === null ? null : (
                 <button onClick={() => setInviteOpen(true)}>
-                  Show invitation
+                  {t("Show invitation")}
                 </button>
               )}
               <Modal
                 open={inviteOpen}
                 onClose={() => setInviteOpen(false)}
-                title="Invite your anchor"
-                description="A private, single-use invitation. Valid for one hour."
+                title={t("Invite your anchor")}
+                description={t(
+                  "A private, single-use invitation. Valid for one hour.",
+                )}
               >
                 {invite === null ? null : (
                   <div className="notice small">
                     <p>
-                      Single-use invitation, valid one hour. Shown once {"—"}{" "}
-                      copy it now.
+                      {t(
+                        "Single-use invitation, valid one hour. Shown once — copy it now.",
+                      )}
                     </p>
                     <p className="mono" style={{ overflowWrap: "anywhere" }}>
                       {inviteLink(eventId, invite.inviteCode)}
                     </p>
                     <p className="muted">
-                      Open it in a different browser profile or an incognito
-                      window: the same profile would join as you, the owner.
+                      {t(
+                        "Open it in a different browser profile or an incognito window: the same profile would join as you, the owner.",
+                      )}
                     </p>
                     <button
                       onClick={() => {
                         void navigator.clipboard
                           .writeText(inviteLink(eventId, invite.inviteCode))
-                          .then(() => setCopyMessage("Invitation copied."))
+                          .then(() => setCopyMessage(t("Invitation copied.")))
                           .catch(() =>
                             setCopyMessage(
-                              "Copy unavailable. Select and copy the link above.",
+                              t(
+                                "Copy unavailable. Select and copy the link above.",
+                              ),
                             ),
                           );
                       }}
                     >
-                      Copy invitation link
+                      {t("Copy invitation link")}
                     </button>
                     <p role="status">{copyMessage}</p>
                   </div>
@@ -948,42 +902,37 @@ export function OrganizerConsole({
               </Modal>
             </div>
 
-            {/*
-              The raw Firebase UID read as a debug leak. It stays available for
-              support, one disclosure away, rather than in the page footer.
-            */}
             <p className="small muted">
-              Signed in anonymously · this browser only. Demo data expires{" "}
-              {new Date(state.expiresAt).toLocaleString()}.
+              {t("Signed in as {uid}. Demo data expires {time}.", {
+                uid,
+                time: new Date(state.expiresAt).toLocaleString(),
+              })}
             </p>
-            <details className="small muted">
-              <summary>Session details</summary>
-              <span className="mono">{uid}</span>
-            </details>
           </div>
         </div>
 
         <Modal
           open={keynoteOpen}
           onClose={() => setKeynoteOpen(false)}
-          title="Load rehearsal at keynote?"
-          description="Publishes the seeded draft and advances the opening so the keynote is active, using the normal stage commands only."
+          title={t("Load rehearsal at keynote?")}
+          description={t(
+            "Publishes the seeded draft and advances the opening so the keynote is active, using the normal stage commands only.",
+          )}
           busy={busy}
         >
           <p className="small muted">
-            The commands run in order — publish, start and complete the opening,
-            advance the scenario clock to each published cue boundary, then
-            start the keynote. No rule is bypassed and every step is an ordinary
-            idempotent command.
+            {t(
+              "The commands run in order — publish, start and complete the opening, advance the scenario clock to each published cue boundary, then start the keynote. No rule is bypassed and every step is an ordinary idempotent command.",
+            )}
           </p>
           <div className="row end">
             <button disabled={busy} onClick={() => setKeynoteOpen(false)}>
-              Cancel
+              {t("Cancel")}
             </button>
             <Button disabled={busy} onClick={() => void onLoadRehearsal()}>
               {command.status === "pending"
-                ? "Loading…"
-                : "Load rehearsal at keynote"}
+                ? t("Loading…")
+                : t("Load rehearsal at keynote")}
             </Button>
           </div>
           <CommandNotice
@@ -1001,22 +950,26 @@ export function OrganizerConsole({
         <Modal
           open={publishOpen}
           onClose={() => setPublishOpen(false)}
-          title="Publish the runbook?"
-          description="This validates your draft and shares the approved agenda with your anchor. Direct agenda and fact editing closes after publication."
+          title={t("Publish the runbook?")}
+          description={t(
+            "This validates your draft and shares the approved agenda with your anchor. Direct agenda and fact editing closes after publication.",
+          )}
           busy={busy}
         >
           <p>
-            {ordered.length} cues · Hard finish{" "}
-            {localTime(state.startsAt, state.hardEndMin)} IST
+            {t("{count} cues · Hard finish {time} IST", {
+              count: ordered.length,
+              time: localTime(state.startsAt, state.hardEndMin),
+            })}
           </p>
           <div className="row end">
             <button disabled={busy} onClick={() => setPublishOpen(false)}>
-              Keep reviewing
+              {t("Keep reviewing")}
             </button>
             <Button disabled={busy} onClick={() => void onPublish()}>
               {command.status === "pending"
-                ? "Publishing…"
-                : "Check and publish"}
+                ? t("Publishing…")
+                : t("Validate and publish")}
             </Button>
           </div>
           {command.message && (
@@ -1036,7 +989,7 @@ export function OrganizerConsole({
                 })
               }
             >
-              Retry original request
+              {t("Retry original request")}
             </button>
           )}
         </Modal>
@@ -1048,8 +1001,10 @@ export function OrganizerConsole({
               command.reset();
             }
           }}
-          title="Recovery plan"
-          description="Check every timing change before you publish it to your anchor."
+          title={t("Review the recovery plan")}
+          description={t(
+            "Check every timing change before publishing a new revision.",
+          )}
           busy={busy}
         >
           {proposal === null ? null : (
@@ -1080,7 +1035,7 @@ export function OrganizerConsole({
                 })
               }
             >
-              Retry original request
+              {t("Retry original request")}
             </button>
           )}
         </Modal>

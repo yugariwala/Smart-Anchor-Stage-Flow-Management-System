@@ -18,12 +18,24 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   await expect(
     page.getByRole("link", { name: "आपके कार्यक्रम", exact: true }).first(),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "आपके कार्यक्रम", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("स्पष्ट योजना। जुड़ी हुई टीम। नियंत्रण में मंच।"),
+  ).toBeVisible();
   await page.reload();
   await expect(interfaceLanguage).toHaveValue("hi");
   await interfaceLanguage.selectOption("gu");
   await expect(page.locator("html")).toHaveAttribute("lang", "gu");
   await expect(
     page.getByRole("link", { name: "તમારા કાર્યક્રમો", exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "તમારા કાર્યક્રમો", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("સ્પષ્ટ યોજના. જોડાયેલી ટીમ. નિયંત્રણમાં મંચ."),
   ).toBeVisible();
   await interfaceLanguage.selectOption("en");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");

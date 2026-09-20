@@ -147,7 +147,7 @@ an API test passing counts as "exercised on a running stack".
 | Reduced-motion respected | web | **Verified** | e2e emulates `reduce` and asserts computed animation, transition and scroll behavior | MUST | Native media emulation against the running app |
 | Mobile-portrait anchor, desktop console | web | **Verified** | e2e captures `anchor-mobile.png` at mobile viewport | MUST | |
 | Script language selection (en / hi / gu) | web | **Verified** | `script-review.test.tsx`; e2e (`Kind`, language select) | MUST | |
-| Localised **interface chrome** | web | **Verified** | hosted e2e checks Hindi persistence plus Hindi/Gujarati navigation and document `lang` | SHOULD | English, Hindi and Gujarati shell copy; translations are not native-reviewed |
+| Localised **interface and page copy** | web | **Verified** | `i18n.test.ts`; local full-rehearsal e2e checks Hindi persistence, Hindi/Gujarati page copy, navigation and document `lang` | SHOULD | English, Hindi and Gujarati across workspace, setup, console, anchor, content, history, settings and help; exact mandated compliance labels remain English; translations are not native-reviewed |
 | Native-speaker-reviewed hi/gu sample packs | — | **Not built** | — | SHOULD | §18 forbids claiming hi/gu quality without a qualified reviewer |
 
 ## Deployment & ops

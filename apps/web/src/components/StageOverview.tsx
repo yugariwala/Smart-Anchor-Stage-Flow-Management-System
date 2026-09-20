@@ -4,7 +4,9 @@ import {
   type Speaker,
 } from "@cuepilot/domain";
 import { localTime } from "../lib/format";
+import { FreshnessChip } from "./Freshness";
 import type { Freshness } from "../lib/useSnapshotPoll";
+import { useI18n } from "../lib/i18n";
 
 // Presentation contract only. The current backend does not supply photos or roles.
 type StageSpeaker = Speaker & { photoUrl?: string; role?: string };
@@ -15,17 +17,17 @@ const countdown = (seconds: number) => {
 export function StageOverview({
   state,
   nowAt,
+  revision,
   freshness,
-  lastSyncAt = null,
   stage = false,
 }: {
   state: EventState;
   nowAt: string;
+  revision: number | null;
   freshness: Freshness;
-  /** When the snapshot behind these numbers last arrived, for the "as of" line. */
-  lastSyncAt?: number | null;
   stage?: boolean;
 }) {
+  const { t } = useI18n();
   const view = renderOperationalCue(state, nowAt);
   const speaker = state.speakers.find(
     (person) => person.id === view.current?.speakerId,
@@ -51,34 +53,13 @@ export function StageOverview({
     speaker?.photoUrl && /^https?:\/\//.test(speaker.photoUrl)
       ? speaker.photoUrl
       : null;
-
-  const currentCue = state.cues.find((c) => c.id === view.current?.cueId);
-  const plannedStartLocal =
-    view.current === null
-      ? ""
-      : localTime(
-          state.startsAt,
-          currentCue?.plannedStartMin ?? view.current.startMin,
-        );
-  const plannedEndLocal =
-    view.current === null
-      ? ""
-      : localTime(
-          state.startsAt,
-          currentCue?.plannedEndMin ?? view.current.endMin,
-        );
-  const plannedDiffers =
-    view.current !== null &&
-    (plannedStartLocal !== view.current.startsAtLocal ||
-      plannedEndLocal !== view.current.endsAtLocal);
-
   return (
     <section
       className={`stage-overview ${stage ? "stage-overview-dark" : ""}`}
-      aria-label="Live stage overview"
+      aria-label={t("Live stage overview")}
     >
       <div className="stage-person">
-        <span className="stage-eyebrow">ON STAGE</span>
+        <span className="stage-eyebrow">{t("ON STAGE")}</span>
         {photo ? (
           <img
             className="stage-portrait"
@@ -92,84 +73,83 @@ export function StageOverview({
         )}
         <h2>
           {speaker?.displayName ??
-            (view.current ? "Event host" : "Nobody on stage")}
+            (view.current ? t("Event host") : t("Stage standby"))}
         </h2>
         {speaker?.role && <p className="small muted">{speaker.role}</p>}
         {speaker?.pronunciationHint && (
           <p className="stage-pronunciation">
-            <span>Pronunciation</span>
+            <span>{t("Pronunciation")}</span>
             {speaker.pronunciationHint}
           </p>
         )}
-        {/*
-          Saying "No speaker assigned" directly beneath a name read as a
-          contradiction. With a session running but no named speaker, the heading
-          above already says who has the stage.
-        */}
         <span className="small muted">
           {speaker
-            ? "Speaking now"
-            : view.current
-              ? "Hosted by your anchor"
-              : "Waiting to start"}
+            ? t("Assigned to the current cue")
+            : t("No speaker assigned")}
         </span>
       </div>
       <div className="stage-activity">
         <div className="row spread">
-          <span className="stage-eyebrow">CURRENT ACTIVITY</span>
+          <span className="stage-eyebrow">{t("CURRENT ACTIVITY")}</span>
           <span className={`chip ${view.current ? "chip-ok" : "chip-info"}`}>
             {view.current
-              ? "ACTIVE"
+              ? t("ACTIVE")
               : state.phase === "ended"
-                ? "COMPLETE"
-                : "STANDBY"}
+                ? t("COMPLETE")
+                : t("STANDBY")}
           </span>
         </div>
         <h2 className="stage-cue-title">
           {view.current?.title ??
             (state.phase === "ended"
-              ? "That’s a wrap."
+              ? t("That’s a wrap.")
               : state.phase === "draft"
-                ? "Ready when you are."
-                : "Nothing on stage yet")}
+                ? t("Ready when you are.")
+                : t("Between cues"))}
         </h2>
         <p className="stage-window">
           {view.current
-            ? `${view.current.startsAtLocal}–${view.current.endsAtLocal} IST · started / expected to end`
+            ? t("{start}–{end} IST · actual start / forecast end", {
+                start: view.current.startsAtLocal,
+                end: view.current.endsAtLocal,
+              })
             : state.phase === "draft"
-              ? "Review and publish your agenda to begin."
-              : "Waiting for the next session."}
+              ? t("Review and publish your agenda to begin.")
+              : t("Waiting for the next cue.")}
         </p>
-        {/*
-          The planned window is only worth a line when it DIFFERS from what is actually
-          happening. Printing the same two times twice under different labels was noise
-          on a phone held at arm's length.
-        */}
-        {plannedDiffers && (
+        {view.current && (
           <p className="small muted">
-            Planned: {plannedStartLocal}–{plannedEndLocal} IST
+            {t("Planned window:")}{" "}
+            {localTime(
+              state.startsAt,
+              state.cues.find((c) => c.id === view.current?.cueId)
+                ?.plannedStartMin ?? view.current.startMin,
+            )}
+            –
+            {localTime(
+              state.startsAt,
+              state.cues.find((c) => c.id === view.current?.cueId)
+                ?.plannedEndMin ?? view.current.endMin,
+            )}{" "}
+            IST
           </p>
         )}
-      </div>
-      {/*
-        `up next` is a sibling of the activity block rather than a child of it, so the
-        mobile stack can place the countdown between them. On a 390-wide phone the
-        countdown was previously clipped at the fold — it is the single thing an anchor
-        checks most often.
-      */}
-      <div className="stage-up-next">
-        <span className="stage-eyebrow">UP NEXT</span>
-        <strong>{view.next?.title ?? "Nothing further scheduled"}</strong>
-        {view.next && (
-          <p>
-            {nextSpeaker?.displayName ?? "Event host"}{" "}
-            <span>· {view.next.startsAtLocal} IST</span>
-          </p>
-        )}
+        <div className="stage-up-next">
+          <span className="stage-eyebrow">{t("UP NEXT")}</span>
+          <strong>{view.next?.title ?? t("Nothing further scheduled")}</strong>
+          {view.next && (
+            <p>
+              {nextSpeaker?.displayName ?? t("Event host")}{" "}
+              <span>· {view.next.startsAtLocal} IST</span>
+            </p>
+          )}
+        </div>
       </div>
       <div className="stage-timing">
         <span className="stage-eyebrow">
-          {seconds !== null && seconds < 0 ? "RUNNING OVER" : "TIME REMAINING"}
+          {seconds !== null && seconds < 0
+            ? t("PAST FORECAST END")
+            : t("TIME REMAINING")}
         </span>
         <div
           className={`stage-countdown ${seconds !== null && seconds < 0 ? "is-overdue" : ""}`}
@@ -179,39 +159,26 @@ export function StageOverview({
         </div>
         <p className="small muted">
           {state.mode === "rehearsal"
-            ? "Practice clock — you move it"
+            ? t("Scenario clock · advances manually")
             : freshness !== "live"
-              ? "Offline estimate · updates paused"
-              : "Synced to the server clock"}
+              ? t("Offline estimate · updates paused")
+              : t("Synced to the server clock")}
         </p>
-        {/*
-          "Is this current?" was answerable only by hunting for the chip at the top of the
-          page. This answers it where the eye already is, in words rather than a colour.
-        */}
-        {lastSyncAt === null ? null : (
-          <p className="small muted stage-asof">
-            {freshness === "live" ? "Updated" : "Last updated"}{" "}
-            {new Date(lastSyncAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })}
-          </p>
-        )}
         <dl className="stage-finishes">
           <div>
-            <dt>Projected finish</dt>
+            <dt>{t("Projected finish")}</dt>
             <dd>
               {view.projectedFinishLocal ?? "—"} <small>IST</small>
             </dd>
           </div>
           <div>
-            <dt>Must finish by</dt>
+            <dt>{t("Hard finish")}</dt>
             <dd>
               {localTime(state.startsAt, state.hardEndMin)} <small>IST</small>
             </dd>
           </div>
         </dl>
+        <FreshnessChip freshness={freshness} revision={revision} />
       </div>
     </section>
   );
