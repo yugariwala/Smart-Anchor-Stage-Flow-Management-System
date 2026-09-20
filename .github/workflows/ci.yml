@@ -37,3 +37,5 @@ jobs:
         run: npm run deploy:web
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+
