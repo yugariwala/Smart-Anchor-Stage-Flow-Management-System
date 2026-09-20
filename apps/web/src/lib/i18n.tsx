@@ -273,6 +273,35 @@ const hi = {
   "Return to console": "कंसोल पर लौटें",
   "Schedule needs repair": "शेड्यूल में सुधार चाहिए",
   "Cached copy": "कैश की गई प्रति",
+  "Voice assistant": "आवाज़ सहायक",
+  "READ-ONLY VOICE ASSISTANT": "केवल-पढ़ने योग्य आवाज़ सहायक",
+  "Ask about the current cue, next cue, or time remaining. Voice cannot change the runbook.":
+    "वर्तमान संकेत, अगले संकेत या बचे समय के बारे में पूछें। आवाज़ रनबुक को बदल नहीं सकती।",
+  "Ask CuePilot": "CuePilot से पूछें",
+  "Listening…": "सुन रहा है…",
+  "Voice answers pause while the runbook is offline or stale.":
+    "रनबुक ऑफ़लाइन या पुरानी होने पर आवाज़ के उत्तर रुक जाते हैं।",
+  "Voice input is not supported in this browser.":
+    "इस ब्राउज़र में आवाज़ इनपुट समर्थित नहीं है।",
+  "Voice input could not start. Try again.":
+    "आवाज़ इनपुट शुरू नहीं हो सका। फिर प्रयास करें।",
+  "I couldn’t hear that. Try again.": "मैं वह सुन नहीं सका। फिर प्रयास करें।",
+  "You asked:": "आपने पूछा:",
+  "There is no active cue right now.": "अभी कोई सक्रिय संकेत नहीं है।",
+  "Current cue: {cue}.": "वर्तमान संकेत: {cue}।",
+  "Nothing further is scheduled.": "आगे कुछ निर्धारित नहीं है।",
+  "Up next: {cue}.": "अगला: {cue}।",
+  "There is no active cue to time.":
+    "समय बताने के लिए कोई सक्रिय संकेत नहीं है।",
+  "{minutes} minutes remain in {cue}.": "{cue} में {minutes} मिनट बाकी हैं।",
+  "{cue} has reached its forecast end.":
+    "{cue} अपने अनुमानित अंत पर पहुँच गया है।",
+  "{cue} is {minutes} minutes past its forecast end.":
+    "{cue} अपने अनुमानित अंत से {minutes} मिनट आगे है।",
+  "Ask what is current, what is next, or how much time remains.":
+    "पूछें कि अभी क्या है, अगला क्या है, या कितना समय बाकी है।",
+  "I didn’t understand. Ask about the current cue, next cue, or time remaining.":
+    "मैं समझ नहीं पाया। वर्तमान संकेत, अगले संकेत या बचे समय के बारे में पूछें।",
   "Approved script": "स्वीकृत स्क्रिप्ट",
   "No approved copy for this cue yet. The organizer drafts and approves host copy from the Scripts page; it appears here once approved.":
     "इस संकेत के लिए अभी स्वीकृत प्रति नहीं है। आयोजक स्क्रिप्ट पेज से संचालक प्रति बनाकर स्वीकृत करता है; स्वीकृति के बाद वह यहाँ दिखती है।",
@@ -990,6 +1019,35 @@ const gu: { [Key in keyof typeof hi]: string } = {
   "Return to console": "કન્સોલ પર પાછા ફરો",
   "Schedule needs repair": "શેડ્યૂલમાં સુધારો જરૂરી છે",
   "Cached copy": "કૅશ કરેલી નકલ",
+  "Voice assistant": "અવાજ સહાયક",
+  "READ-ONLY VOICE ASSISTANT": "ફક્ત વાંચી શકાય એવો અવાજ સહાયક",
+  "Ask about the current cue, next cue, or time remaining. Voice cannot change the runbook.":
+    "વર્તમાન સંકેત, આગળના સંકેત અથવા બાકી સમય વિશે પૂછો. અવાજ રનબુક બદલી શકતો નથી.",
+  "Ask CuePilot": "CuePilotને પૂછો",
+  "Listening…": "સાંભળી રહ્યું છે…",
+  "Voice answers pause while the runbook is offline or stale.":
+    "રનબુક ઑફલાઇન અથવા જૂની હોય ત્યારે અવાજના જવાબો થંભે છે.",
+  "Voice input is not supported in this browser.":
+    "આ બ્રાઉઝરમાં અવાજ ઇનપુટ સમર્થિત નથી.",
+  "Voice input could not start. Try again.":
+    "અવાજ ઇનપુટ શરૂ થઈ શક્યો નહીં. ફરી પ્રયાસ કરો.",
+  "I couldn’t hear that. Try again.":
+    "હું તે સાંભળી શક્યો નહીં. ફરી પ્રયાસ કરો.",
+  "You asked:": "તમે પૂછ્યું:",
+  "There is no active cue right now.": "અત્યારે કોઈ સક્રિય સંકેત નથી.",
+  "Current cue: {cue}.": "વર્તમાન સંકેત: {cue}.",
+  "Nothing further is scheduled.": "આગળ કંઈ નિર્ધારિત નથી.",
+  "Up next: {cue}.": "આગળ: {cue}.",
+  "There is no active cue to time.": "સમય જણાવવા માટે કોઈ સક્રિય સંકેત નથી.",
+  "{minutes} minutes remain in {cue}.": "{cue}માં {minutes} મિનિટ બાકી છે.",
+  "{cue} has reached its forecast end.":
+    "{cue} તેના અનુમાનિત અંતે પહોંચી ગયો છે.",
+  "{cue} is {minutes} minutes past its forecast end.":
+    "{cue} તેના અનુમાનિત અંતથી {minutes} મિનિટ આગળ છે.",
+  "Ask what is current, what is next, or how much time remains.":
+    "પૂછો કે અત્યારે શું છે, આગળ શું છે અથવા કેટલો સમય બાકી છે.",
+  "I didn’t understand. Ask about the current cue, next cue, or time remaining.":
+    "હું સમજી શક્યો નહીં. વર્તમાન સંકેત, આગળના સંકેત અથવા બાકી સમય વિશે પૂછો.",
   "Approved script": "મંજૂર સ્ક્રિપ્ટ",
   "No approved copy for this cue yet. The organizer drafts and approves host copy from the Scripts page; it appears here once approved.":
     "આ સંકેત માટે હજી મંજૂર નકલ નથી. આયોજક સ્ક્રિપ્ટ પેજ પરથી સંચાલક નકલ બનાવી મંજૂર કરે છે; મંજૂરી પછી તે અહીં દેખાય છે.",

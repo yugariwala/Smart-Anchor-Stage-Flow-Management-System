@@ -421,3 +421,22 @@ is no longer callable, and anything derived from them must be corrected before i
 Sweep result on 2026-09-19: no source file, config file, test or committed artifact names 2.5
 as the model in use. The only remaining mentions are the deliberate historical records in
 `docs/decisions.md` and `docs/measurements.md` that quote the provider's 404 and §7B itself.
+
+## 2026-09-20 - roadmap voice assistant is read-only
+
+The master report correctly excludes speech recognition and autonomous stage control from the
+MVP. Post-MVP roadmap work was explicitly requested after the MVP was completed, but that does
+not relax the permission or authority model. The first voice increment is therefore a read-only
+anchor aid:
+
+- Browser-provided speech recognition maps a small English, Hindi or Gujarati phrase set to one
+  of four deterministic intents: current cue, next cue, remaining time or help.
+- Answers come only from `renderOperationalCue` fields in the latest live published snapshot.
+  Generated host copy is never parsed for timing.
+- The assistant pauses on cached or stale data, and it degrades to the existing visual runbook
+  when browser speech recognition is unavailable.
+- Speech synthesis uses the selected interface locale when the browser/OS supplies a matching
+  voice. No telephony, third-party speech dependency, LLM call or backend route was added.
+- An anchor voice phrase cannot start, complete, repair or publish anything. Adding mutating
+  speech commands would require a separate authorized organizer design and server-authoritative
+  command path.

@@ -92,6 +92,7 @@ Feature-level status:
 | Live ops | Cue start/complete, scenario clock, overrun entry and forecast | Complete |
 | Live ops | Live stage overview: on stage, current activity, up next, countdown | Complete |
 | Live ops | Readiness reminder for the next cue | Complete |
+| Live ops | Read-only browser voice assistant for current cue, next cue and time remaining | Implemented — deployment pending; browser support varies |
 | Live ops | Anchor invitations, join, per-revision acknowledgment and behind tracking | Complete |
 | Content | Gemini host-script drafts with mandated labels, human review and approval | Complete |
 | Content | Deterministic template fallback when the AI provider is unavailable | Complete |
@@ -107,19 +108,20 @@ Feature-level status:
 
 ## Roadmap — planned enhancements
 
-These are designed but **not yet implemented**. They are ordered by expected impact for a
-live-event product and are all compatible with the core rule that the backend — not the LLM —
-owns every schedule.
+These are designed follow-ups. They are ordered by expected impact for a live-event product and
+are all compatible with the core rule that the backend — not the LLM — owns every schedule. The
+read-only part of the voice assistant is now implemented; voice-triggered stage mutations remain
+deliberately outside the anchor role.
 
 | Enhancement | What it adds | Priority |
 |---|---|---|
-| **AI voice anchor assistant** | Hands-free control in the browser using on-device speech (Web Speech API). The anchor says "how long is the keynote?" or "start the next cue" and hears deterministic operational times back. Commands still go through the same server-authoritative actions, so the LLM never invents a timestamp. No telephony required. | High |
+| **Voice-triggered stage commands** | The anchor runbook can now answer current cue, next cue and time-remaining questions through browser speech input/output in English, Hindi and Gujarati. It is read-only and pauses on stale data. Any future start/complete command must use an authorized organizer workflow and the same server-authoritative actions. No telephony. | High |
 | **AI speaker reminder / check-in agent** | An automated agent that proactively contacts upcoming speakers (WhatsApp / SMS / email, optional voice call) to confirm they are present and on time, feeding the existing "Speaker arriving late?" path. Overruns get handled *before* they happen, not after. | High |
 | **Predictive overrun engine** | Learns per-speaker and per-cue overrun patterns from completed events and warns the organizer before a cue is likely to run long, so a repair can be prepared in advance. | High |
 | **Natural-language command bar** | The organizer types or dictates "keynote is running 8 minutes late" and the model maps that to the delay/release command. It only interprets intent; the deterministic solver still computes every timestamp. | High |
 | **Push notifications + installable PWA** | A service worker so the runbook is installable, works offline, and pushes approved revisions and announcements to anchors and speakers without an open tab. | Medium |
 | **Post-event analytics report** | Actual vs planned per cue, recovered time, repair cost, and an auto-generated event summary — useful evidence for organizers and sponsors. | Medium |
-| **Localised voice output** | Spoken Hindi, Gujarati and English output for the already-localised interface and multilingual host copy. | Medium |
+| **Reviewed localised voice experience** | Browser speech input/output now selects English, Hindi or Gujarati from the interface locale. Native-speaker testing and browser/OS voice-availability validation remain. | Medium |
 | **Role-based collaboration** | Co-organizer and stage-manager roles with their own permissions and a full audit trail, so a large event is not tied to one anonymous browser. | Medium |
 | **Calendar export + QR speaker check-in** | ICS export of the approved runbook and a QR check-in for speakers and anchors on arrival. | Low |
 | **Emergency "cut to next cue" mode** | One-tap broadcast that skips the current cue, re-plans immediately, and pushes a clearly labelled emergency revision to every screen. | Low |

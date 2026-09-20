@@ -1366,6 +1366,17 @@ tr.changed > * {
   color: var(--anchor-text);
   margin: 0;
 }
+.voice-assistant > button {
+  margin-top: 10px;
+}
+.voice-assistant > :last-child {
+  margin-bottom: 0;
+}
+.voice-answer {
+  color: var(--anchor-accent);
+  font-size: 18px;
+  font-weight: 650;
+}
 .anchor .muted {
   color: var(--anchor-muted);
 }
