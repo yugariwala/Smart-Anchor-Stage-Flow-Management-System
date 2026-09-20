@@ -9,6 +9,15 @@ on:
 permissions:
   contents: read
 
+# Public browser configuration is compiled into the Vite bundle. Both verification
+# and deployment need it; .env.local is intentionally absent from Git checkouts.
+env:
+  VITE_API_BASE_URL: https://cuepilot-api-production.cuepilot-api.workers.dev/v1
+  VITE_FIREBASE_API_KEY: AIzaSyB-qYmCzgdmfzoZeT7AWJw3EOqVOs_iFVg
+  VITE_FIREBASE_AUTH_DOMAIN: smart-anchor-stage-flow-system.firebaseapp.com
+  VITE_FIREBASE_PROJECT_ID: smart-anchor-stage-flow-system
+  VITE_FIREBASE_APP_ID: 1:1015661485156:web:999ba3988c4c920eae5371
+
 jobs:
   verify:
     runs-on: ubuntu-latest
