@@ -698,6 +698,7 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                           id: crypto.randomUUID(),
                           displayName: "",
                           pronunciationHint: "",
+                          phoneE164: "",
                           facts: [],
                         },
                       ],
@@ -773,6 +774,28 @@ export function SetupScreen({ eventId }: { eventId: string }) {
                           })
                         }
                       />
+                    </div>
+                    <div className="field">
+                      <label htmlFor={`phone-${speaker.id}`}>
+                        {t("Reminder phone (optional)")}
+                      </label>
+                      <input
+                        id={`phone-${speaker.id}`}
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="+919876543210"
+                        value={speaker.phoneE164 ?? ""}
+                        onChange={(event) =>
+                          speakerPatch(index, {
+                            phoneE164: event.target.value.trim(),
+                          })
+                        }
+                      />
+                      <span className="small muted">
+                        {t(
+                          "Include country code. This owner-only number is used only for an explicitly approved reminder call.",
+                        )}
+                      </span>
                     </div>
                   </div>
                   {factsEditor(

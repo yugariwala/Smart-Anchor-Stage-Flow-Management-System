@@ -93,6 +93,7 @@ Feature-level status:
 | Live ops | Live stage overview: on stage, current activity, up next, countdown | Complete |
 | Live ops | Readiness reminder for the next cue | Complete |
 | Live ops | Read-only browser voice assistant for current cue, next cue and time remaining | Implemented — deployment pending; browser support varies |
+| Live ops | Owner-approved one-way speaker reminder calls | Implemented — Twilio secrets, consent review and deployment pending |
 | Live ops | Anchor invitations, join, per-revision acknowledgment and behind tracking | Complete |
 | Content | Gemini host-script drafts with mandated labels, human review and approval | Complete |
 | Content | Deterministic template fallback when the AI provider is unavailable | Complete |
@@ -116,7 +117,7 @@ deliberately outside the anchor role.
 | Enhancement | What it adds | Priority |
 |---|---|---|
 | **Voice-triggered stage commands** | The anchor runbook can now answer current cue, next cue and time-remaining questions through browser speech input/output in English, Hindi and Gujarati. It is read-only and pauses on stale data. Any future start/complete command must use an authorized organizer workflow and the same server-authoritative actions. No telephony. | High |
-| **AI speaker reminder / check-in agent** | An automated agent that proactively contacts upcoming speakers (WhatsApp / SMS / email, optional voice call) to confirm they are present and on time, feeding the existing "Speaker arriving late?" path. Overruns get handled *before* they happen, not after. | High |
+| **Interactive speaker check-in agent** | Owner-approved, one-way Twilio reminder calls are now implemented with fixed copy, retry-safe dialing and no recording. Two-way replies, proactive timing, consent/status records, signed webhooks and WhatsApp/SMS/email remain future work. | High |
 | **Predictive overrun engine** | Learns per-speaker and per-cue overrun patterns from completed events and warns the organizer before a cue is likely to run long, so a repair can be prepared in advance. | High |
 | **Natural-language command bar** | The organizer types or dictates "keynote is running 8 minutes late" and the model maps that to the delay/release command. It only interprets intent; the deterministic solver still computes every timestamp. | High |
 | **Push notifications + installable PWA** | A service worker so the runbook is installable, works offline, and pushes approved revisions and announcements to anchors and speakers without an open tab. | Medium |
@@ -167,7 +168,9 @@ npm run dev:web        # vite on http://localhost:5173
 `apps/api/.dev.vars` is required for `wrangler dev` and is gitignored. Copy
 `apps/api/.dev.vars.example` and fill it in. The web app also needs Firebase web config in
 `apps/web/.env.local` (copy `apps/web/.env.example`). `GEMINI_API_KEY` is a Worker secret, set
-with `npx wrangler secret put GEMINI_API_KEY`, and must never be committed.
+with `npx wrangler secret put GEMINI_API_KEY`, and must never be committed. Voice reminders are
+off by default. Enabling them also requires the three Worker secrets documented in
+`apps/api/.dev.vars.example`; no provider credential belongs in a repository file.
 
 ## Commands
 

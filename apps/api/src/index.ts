@@ -17,8 +17,14 @@ import {
   TokenVerificationError,
   type TokenVerifier,
 } from './auth/verifyFirebaseToken';
-import { EventRoom, type Env, type MutationEnvelope } from './objects/EventRoom';
+import {
+  EventRoom,
+  type Env,
+  type MutationEnvelope,
+  type SpeakerReminderReservation,
+} from './objects/EventRoom';
 import { QuotaRoom } from './objects/QuotaRoom';
+import { placeReminderCall, VoiceProviderError } from './voice/twilio';
 
 export { EventRoom, QuotaRoom };
 
@@ -32,12 +38,17 @@ const INVITATION_TTL_MS = 60 * 60 * 1000;
 const nowIso = (): string => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 const base64url = (bytes: Uint8Array): string =>
-  btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 
 // ───────────────────────────────── CORS ────────────────────────────────────────────────
 
 const allowedOrigins = (env: Env): string[] =>
-  env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter((o) => o.length > 0);
+  env.ALLOWED_ORIGINS.split(',')
+    .map((o) => o.trim())
+    .filter((o) => o.length > 0);
 
 const corsHeaders = (env: Env, origin: string | null): Record<string, string> => {
   if (origin === null || !allowedOrigins(env).includes(origin)) return {};
@@ -141,7 +152,7 @@ const envelope = async (
 type CommandResponse = { status: number; body: unknown };
 
 /** Rebuilds a typed ApiError that crossed the Durable Object RPC boundary. */
-const viaRoom = async (call: Promise<CommandResponse>): Promise<CommandResponse> => {
+const viaRoomValue = async <T>(call: Promise<T>): Promise<T> => {
   try {
     return await call;
   } catch (cause) {
@@ -150,6 +161,7 @@ const viaRoom = async (call: Promise<CommandResponse>): Promise<CommandResponse>
     throw cause;
   }
 };
+const viaRoom = (call: Promise<CommandResponse>): Promise<CommandResponse> => viaRoomValue(call);
 
 // ───────────────────────────────── routing ─────────────────────────────────────────────
 
@@ -168,6 +180,11 @@ const verifierFor = (env: Env): TokenVerifier => {
 /** Overridable for tests: they inject a local key set, never a bypass. */
 export const __setVerifierForTests = (verifier: TokenVerifier | null, projectId: string): void => {
   cachedVerifier = verifier === null ? null : { projectId, verifier };
+};
+
+let voiceFetchForTests: typeof fetch | null = null;
+export const __setVoiceFetchForTests = (doFetch: typeof fetch | null): void => {
+  voiceFetchForTests = doFetch;
 };
 
 const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promise<Response> => {
@@ -198,7 +215,11 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
     const body = await readJsonBody(request);
     const env0 = await envelope(request, uid, path, body, serverNow);
     // Admission before creation. Reserved even if creation then fails, by design.
-    await (quotaRoom(env) as unknown as { admitEventCreation(uid: string, nowIso: string): Promise<void> })
+    await (
+      quotaRoom(env) as unknown as {
+        admitEventCreation(uid: string, nowIso: string): Promise<void>;
+      }
+    )
       .admitEventCreation(uid, serverNow)
       .catch((cause: unknown) => {
         const decoded = decodeApiError(cause);
@@ -221,14 +242,24 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
   // PUT /v1/events/{id}/draft
   if (request.method === 'PUT' && tail.length === 1 && tail[0] === 'draft') {
     const body = await readJsonBody(request);
-    const out = await viaRoom(stub.saveDraft({ ...(await envelope(request, uid, path, body, serverNow)), body }));
+    const out = await viaRoom(
+      stub.saveDraft({
+        ...(await envelope(request, uid, path, body, serverNow)),
+        body,
+      }),
+    );
     return respond(ctx, out.status, out.body);
   }
 
   // POST /v1/events/{id}/publish
   if (request.method === 'POST' && tail.length === 1 && tail[0] === 'publish') {
     const body = await readJsonBody(request);
-    const out = await viaRoom(stub.publish({ ...(await envelope(request, uid, path, body, serverNow)), body }));
+    const out = await viaRoom(
+      stub.publish({
+        ...(await envelope(request, uid, path, body, serverNow)),
+        body,
+      }),
+    );
     return respond(ctx, out.status, out.body);
   }
 
@@ -284,14 +315,15 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
     return respond(ctx, out.status, out.body);
   }
 
-
   // POST /v1/events/{id}/repair-proposals
   if (request.method === 'POST' && tail.length === 1 && tail[0] === 'repair-proposals') {
     const body = await readJsonBody(request);
     const env0 = await envelope(request, uid, path, body, serverNow);
     // The proposal id is minted here so a retried request replays the SAME proposal from the
     // ledger rather than creating a second one.
-    const out = await viaRoom(stub.proposeRepair({ ...env0, body, proposalId: crypto.randomUUID() }));
+    const out = await viaRoom(
+      stub.proposeRepair({ ...env0, body, proposalId: crypto.randomUUID() }),
+    );
     return respond(ctx, out.status, out.body);
   }
 
@@ -314,7 +346,6 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
     return respond(ctx, out.status, out.body);
   }
 
-
   // POST /v1/events/{id}/script-proposals
   if (request.method === 'POST' && tail.length === 1 && tail[0] === 'script-proposals') {
     const body = await readJsonBody(request);
@@ -322,7 +353,9 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
     // Project cap first, so an event is never charged a per-event unit only to be refused by
     // a project-wide condition. See docs/decisions.md for the over-admission trade.
     await (
-      quotaRoom(env) as unknown as { admitAiAttempt(nowIso: string): Promise<void> }
+      quotaRoom(env) as unknown as {
+        admitAiAttempt(nowIso: string): Promise<void>;
+      }
     )
       .admitAiAttempt(serverNow)
       .catch((cause: unknown) => {
@@ -347,7 +380,12 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
     // outside the transaction, exactly like the idempotency hash.
     const inputHash = await sha256Hex(canonicalJson({ proposalId: tail[1], body }));
     const out = await viaRoom(
-      stub.approveScript({ ...env0, body, proposalId: tail[1] as string, inputHash }),
+      stub.approveScript({
+        ...env0,
+        body,
+        proposalId: tail[1] as string,
+        inputHash,
+      }),
     );
     return respond(ctx, out.status, out.body);
   }
@@ -357,7 +395,11 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
     const body = await readJsonBody(request);
     const env0 = await envelope(request, uid, path, body, serverNow);
     const out = await viaRoom(
-      stub.publishAnnouncement({ ...env0, body, announcementId: crypto.randomUUID() }),
+      stub.publishAnnouncement({
+        ...env0,
+        body,
+        announcementId: crypto.randomUUID(),
+      }),
     );
     return respond(ctx, out.status, out.body);
   }
@@ -372,9 +414,57 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
     const body = await readJsonBody(request);
     const env0 = await envelope(request, uid, path, body, serverNow);
     const out = await viaRoom(
-      stub.dismissAnnouncement({ ...env0, body, announcementId: tail[1] as string }),
+      stub.dismissAnnouncement({
+        ...env0,
+        body,
+        announcementId: tail[1] as string,
+      }),
     );
     return respond(ctx, out.status, out.body);
+  }
+
+  // POST /v1/events/{id}/speakers/{sid}/reminder-call
+  if (
+    request.method === 'POST' &&
+    tail.length === 3 &&
+    tail[0] === 'speakers' &&
+    tail[2] === 'reminder-call'
+  ) {
+    const body = await readJsonBody(request);
+    const env0 = await envelope(request, uid, path, body, serverNow);
+    const reservation = await viaRoomValue<SpeakerReminderReservation>(
+      stub.reserveSpeakerReminder({
+        ...env0,
+        body,
+        speakerId: tail[1] as string,
+      }),
+    );
+    if (reservation.replay !== null) {
+      return respond(ctx, reservation.replay.status, reservation.replay.body);
+    }
+    if (reservation.call === null) {
+      throw apiError('INTERNAL', 'Reminder call reservation was incomplete.');
+    }
+
+    let outcome: CommandResponse;
+    try {
+      await placeReminderCall(reservation.call, env, voiceFetchForTests ?? fetch);
+      outcome = {
+        status: 201,
+        body: { speakerId: tail[1], queued: true },
+      };
+    } catch (cause) {
+      const code =
+        cause instanceof VoiceProviderError && cause.kind === 'not_configured'
+          ? 'VOICE_NOT_CONFIGURED'
+          : 'VOICE_PROVIDER_UNAVAILABLE';
+      const message =
+        cause instanceof VoiceProviderError ? cause.message : 'The voice provider is unavailable.';
+      const error = apiError(code, message);
+      outcome = { status: error.status, body: error.toBody() };
+    }
+    const final = await viaRoom(stub.finishSpeakerReminder(env0, outcome));
+    return respond(ctx, final.status, final.body);
   }
 
   // POST /v1/events/{id}/cues/{cid}/start  and  /complete
@@ -415,11 +505,12 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
         !Number.isInteger(limit) ||
         limit < 1
       ) {
-        return fail(ctx, apiError('VALIDATION_FAILED', 'before and limit must be positive integers.'));
+        return fail(
+          ctx,
+          apiError('VALIDATION_FAILED', 'before and limit must be positive integers.'),
+        );
       }
-      const out = await viaRoom(
-        stub.listRevisions(uid, before, limit, serverNow),
-      );
+      const out = await viaRoom(stub.listRevisions(uid, before, limit, serverNow));
       return respond(ctx, out.status, out.body);
     }
     if (tail.length === 2) {
@@ -435,7 +526,12 @@ const route = async (request: Request, ctx: Ctx, verifier: TokenVerifier): Promi
   // DELETE /v1/events/{id}
   if (request.method === 'DELETE' && tail.length === 0) {
     const body = await readJsonBody(request);
-    const out = await viaRoom(stub.destroy({ ...(await envelope(request, uid, path, body, serverNow)), body }));
+    const out = await viaRoom(
+      stub.destroy({
+        ...(await envelope(request, uid, path, body, serverNow)),
+        body,
+      }),
+    );
     return respond(ctx, out.status, out.body);
   }
 
@@ -456,7 +552,10 @@ export default {
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
-        headers: { 'X-Request-Id': ctx.requestId, ...corsHeaders(env, ctx.origin) },
+        headers: {
+          'X-Request-Id': ctx.requestId,
+          ...corsHeaders(env, ctx.origin),
+        },
       });
     }
 
@@ -465,9 +564,10 @@ export default {
       response = await route(request, ctx, verifierFor(env));
     } catch (cause) {
       const known = cause instanceof ApiError ? cause : decodeApiError(cause);
-      response = known !== null
-        ? fail(ctx, known)
-        : fail(ctx, apiError('INTERNAL', 'Unexpected server error.'));
+      response =
+        known !== null
+          ? fail(ctx, known)
+          : fail(ctx, apiError('INTERNAL', 'Unexpected server error.'));
       if (known === null) {
         // Sanitized: message only, never a body, a token or speaker content.
         console.error(

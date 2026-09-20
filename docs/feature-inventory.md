@@ -1,6 +1,6 @@
 # Feature inventory
 
-Audited on `main` through the 2026-09-20 voice-assistant implementation. **Status comes from the code**, not from a
+Audited on `main` through the 2026-09-20 speaker-reminder implementation. **Status comes from the code**, not from a
 completion report. Where the README and the source disagree, the source wins and the
 disagreement is listed at the end.
 
@@ -11,7 +11,7 @@ disagreement is listed at the end.
 | `npm run typecheck` | 0 errors |
 | `npm run lint` | pass |
 | `npm run build` | pass |
-| `npm test` | **337 passed / 337**, 21 files — domain 151, api 139, web 47 |
+| `npm test` | **344 passed / 344**, 23 files — domain 151, api 146, web 47 |
 | `npm run test:e2e` | **1 passed**, 52.5 s (recorded Playwright run against deployed Firebase + Cloudflare) |
 
 The API suite runs inside **real `workerd`** via `@cloudflare/vitest-pool-workers`, with real
@@ -100,6 +100,7 @@ an API test passing counts as "exercised on a running stack".
 | Local countdown from server-clock offset | web | **Verified** | `snapshot.test.tsx`; live | MUST | `aria-hidden`; no write per second |
 | Live stage overview / readiness reminder | web | **Verified** | `apps/web/test/stage-readiness.test.tsx`; e2e (`Upcoming cue reminder`) | added-since | |
 | Read-only browser voice assistant | web | **Implemented** | `apps/web/test/voice-assistant.test.ts` (5 tests); full local check + production build | added-since | Answers current/next/remaining from structured state; action wording rejected; pauses on stale data. Real microphone and hosted browser run remain pending. |
+| Owner-approved one-way speaker reminder calls | API + web | **Implemented** | `tests/api/speaker-reminders.test.ts`, `tests/api/twilio-adapter.test.ts` (7 tests); full local check | added-since | Live owner only; explicit preview/confirmation; E.164 contact is stripped from anchor snapshots; reservation is recorded before dialing so a retry cannot call twice. Feature flag is off and no real provider call has been made. |
 | Printable runbook | web | **Verified** | hosted + local e2e; 2-page A4 PDF rendered with Poppler and visually inspected | MUST | Agenda header contrast fixed; blank third page removed; controls hidden and print-only facts/copy present |
 
 ## AI script pipeline
@@ -174,12 +175,12 @@ an API test passing counts as "exercised on a running stack".
 | Status | Count |
 |---|---|
 | **Verified** | 83 |
-| **Implemented** | 1 |
+| **Implemented** | 2 |
 | **Partial** | 1 |
 | **Stubbed** | 0 |
 | **Not built** | 1 |
 | **Cut** | 1 |
-| **Total** | 87 |
+| **Total** | 88 |
 
 ### MUST-tier completion
 
@@ -258,8 +259,8 @@ These exist and work but a judge reading only the README would miss them:
 2. **A formal screen-reader audit is still absent.** Keyboard traversal, focus restoration,
    reduced motion, non-colour status and live-region behavior now have automated evidence, but
    that is not equivalent to testing with VoiceOver, NVDA or another assistive reader.
-3. **Post-MVP roadmap work needs a clear scope boundary.** The newly implemented browser voice
-   assistant is explicitly read-only and recorded as a post-MVP extension; it cannot start or
-   complete cues. The remaining speaker-reminder roadmap item still mentions optional telephony,
-   while §5 says phone calling was excluded from the 28-hour build. Keep that item out of MVP
-   completion claims and require a fresh product/security decision before implementation.
+3. **Post-MVP voice work needs consent and provider validation.** The browser voice assistant is
+   read-only. The reminder caller is a post-MVP, owner-confirmed one-way message, disabled by
+   default and not exercised against a real provider. Do not describe it as an autonomous or
+   two-way AI agent. Interactive check-in still needs purpose-specific consent/status records,
+   signed webhook verification and a provider/legal review before implementation or deployment.

@@ -12,6 +12,7 @@
     "ALLOWED_ORIGINS": "http://localhost:5173",
     "GEMINI_MODEL": "gemini-3.5-flash-lite",
     "AI_ENABLED": "false",
+    "VOICE_REMINDERS_ENABLED": "false",
     "APP_ENV": "dev",
     "BUILD_COMMIT": "dev"
   },
@@ -23,6 +24,7 @@
         "ALLOWED_ORIGINS": "https://smart-anchor-stage-flow-system.web.app,https://smart-anchor-stage-flow-system.firebaseapp.com",
         "GEMINI_MODEL": "gemini-3.5-flash-lite",
         "AI_ENABLED": "true",
+        "VOICE_REMINDERS_ENABLED": "false",
         "APP_ENV": "production",
         "BUILD_COMMIT": "7a1457a"
       },

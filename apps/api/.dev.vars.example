@@ -8,4 +8,11 @@ FIREBASE_PROJECT_ID=your-firebase-project-id
 ALLOWED_ORIGINS=http://localhost:5173
 GEMINI_MODEL=gemini-3.5-flash-lite
 AI_ENABLED=false
+VOICE_REMINDERS_ENABLED=false
 APP_ENV=dev
+
+# Voice reminder credentials are deliberately absent. Enable the feature flag above,
+# then set each production value as a Worker secret, never in this file:
+#   npx wrangler secret put TWILIO_ACCOUNT_SID
+#   npx wrangler secret put TWILIO_AUTH_TOKEN
+#   npx wrangler secret put TWILIO_FROM_NUMBER

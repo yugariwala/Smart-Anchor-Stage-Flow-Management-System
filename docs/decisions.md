@@ -440,3 +440,22 @@ anchor aid:
 - An anchor voice phrase cannot start, complete, repair or publish anything. Adding mutating
   speech commands would require a separate authorized organizer design and server-authoritative
   command path.
+
+## 2026-09-20 - speaker reminder agent starts as an owner-approved one-way call
+
+The roadmap's broad “AI speaker reminder / check-in agent” combines several materially different
+risks. The first increment is therefore a fixed, one-way Twilio reminder rather than an autonomous
+conversation:
+
+- Only the owner of a running live event can open a preview and explicitly place the call.
+- The message is deterministic, cannot alter the schedule and tells the speaker to contact the
+  organizer. It does not record audio or collect a response.
+- The optional E.164 contact stays in owner event state and is removed from every published anchor
+  snapshot. It expires with the event under the existing 72-hour retention rule.
+- The idempotency reservation is persisted before contacting Twilio. An ambiguous retry returns
+  the reservation/final response and does not dial again.
+- Provider calls use inline TwiML and the standard-library `fetch`; no dependency or public webhook
+  was added. The feature is disabled by default, and credentials must be Worker secrets.
+- Two-way speech/DTMF, proactive scheduling and other channels remain separate roadmap work. They
+  require a consent/status data model and validated Twilio webhook signatures before receiving any
+  response from a speaker.
