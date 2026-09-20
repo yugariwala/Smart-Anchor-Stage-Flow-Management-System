@@ -26,6 +26,7 @@ import { rememberEvent } from "../lib/storage";
 import { RunbookTable } from "./EventPages";
 import { StageOverview } from "../components/StageOverview";
 import { ReadinessReminder } from "../components/ReadinessReminder";
+import { VoiceAssistant } from "../components/VoiceAssistant";
 import { useI18n } from "../lib/i18n";
 
 export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
@@ -194,6 +195,17 @@ export function AnchorView({ eventId, uid }: { eventId: string; uid: string }) {
         state={state}
         nowAt={nowAt}
         freshness={poll.freshness}
+      />
+      <VoiceAssistant
+        context={{
+          currentTitle: view.current?.title ?? null,
+          nextTitle: view.next?.title ?? null,
+          remainingMinutes:
+            view.current === null
+              ? null
+              : Math.ceil(view.current.endMin - view.nowMin),
+        }}
+        enabled={poll.freshness === "live" && !poll.fromCache}
       />
       <p className="anchor-line">{view.line}</p>
 

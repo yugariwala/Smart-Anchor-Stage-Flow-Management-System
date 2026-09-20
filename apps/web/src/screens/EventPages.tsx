@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { EventState } from "@cuepilot/domain";
+import type { EventState, Speaker } from "@cuepilot/domain";
 import {
   ArrowRightIcon,
   PersonIcon,
@@ -16,6 +16,7 @@ import {
   getRevision,
   listRevisions,
   errorCopy,
+  placeSpeakerReminderCall,
   proposeScript,
   publishAnnouncement,
   type RevisionEntry,
@@ -89,7 +90,7 @@ export function EventPages({
             </>
           }
         />
-        {page === "speakers" && <Speakers state={state} />}
+        {page === "speakers" && <Speakers state={state} eventId={eventId} />}
         {page === "scripts" && (
           <Scripts
             state={state}
@@ -112,14 +113,60 @@ export function EventPages({
     </>
   );
 }
-function Speakers({ state }: { state: EventState }) {
+function Speakers({ state, eventId }: { state: EventState; eventId: string }) {
   const { t } = useI18n();
+  const command = useCommand();
   const [search, setSearch] = useState("");
+  const [callSpeaker, setCallSpeaker] = useState<Speaker | null>(null);
+  const [calledName, setCalledName] = useState("");
+  const busy = command.status === "pending" || command.status === "unknown";
   const speakers = state.speakers.filter((s) =>
     s.displayName.toLowerCase().includes(search.toLowerCase()),
   );
+  const callCue = callSpeaker
+    ? state.cues
+        .filter(
+          (cue) =>
+            cue.speakerId === callSpeaker.id && cue.status !== "completed",
+        )
+        .sort((a, b) => a.order - b.order)[0]
+    : undefined;
+  const closeCall = () => {
+    if (busy) return;
+    setCallSpeaker(null);
+    command.reset();
+  };
+  const submitCall = async () => {
+    if (!callSpeaker) return;
+    const result = await command.run(`reminder:${callSpeaker.id}`, (key) =>
+      placeSpeakerReminderCall(eventId, callSpeaker.id, state.revision, key),
+    );
+    if (result?.queued) {
+      setCalledName(callSpeaker.displayName);
+      setCallSpeaker(null);
+      command.reset();
+    }
+  };
   return (
     <>
+      <section className="capability-note">
+        <SpeakerLoudIcon />
+        <div>
+          <strong>{t("Owner-approved speaker reminders")}</strong>
+          <p>
+            {state.mode === "rehearsal"
+              ? t("Automated reminder calls are disabled in rehearsal mode.")
+              : t(
+                  "Each call requires your confirmation and plays a fixed one-way reminder. It cannot receive a response.",
+                )}
+          </p>
+        </div>
+      </section>
+      {calledName && (
+        <p className="notice notice-good" role="status">
+          {t("Reminder call queued for {speaker}.", { speaker: calledName })}
+        </p>
+      )}
       <div className="section-toolbar">
         <label className="search-field">
           <PersonIcon />
@@ -191,6 +238,23 @@ function Speakers({ state }: { state: EventState }) {
                     </span>
                   ))}
               </div>
+              {state.mode === "live" &&
+                state.phase === "running" &&
+                speaker.phoneE164 &&
+                state.cues.some(
+                  (cue) =>
+                    cue.speakerId === speaker.id && cue.status !== "completed",
+                ) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCalledName("");
+                      setCallSpeaker(speaker);
+                    }}
+                  >
+                    {t("Review reminder call")}
+                  </button>
+                )}
             </article>
           ))}
         </div>
@@ -205,6 +269,67 @@ function Speakers({ state }: { state: EventState }) {
           </ul>
         </section>
       )}
+      <Modal
+        open={callSpeaker !== null}
+        onClose={closeCall}
+        busy={busy}
+        title={t("Call {speaker}?", {
+          speaker: callSpeaker?.displayName ?? "",
+        })}
+        description={t(
+          "This places an external automated call only after you confirm.",
+        )}
+      >
+        {callSpeaker && (
+          <>
+            <p>
+              {t("Number ending in {lastFour}", {
+                lastFour: callSpeaker.phoneE164?.slice(-4) ?? "",
+              })}
+            </p>
+            <p className="script-body">
+              {t(
+                "Hello {speaker}. This is an automated CuePilot reminder for {event}. Your segment, {cue}, is coming up. Please contact the organizer now to confirm you are ready. This call cannot receive a response.",
+                {
+                  speaker: callSpeaker.displayName,
+                  event: state.name,
+                  cue: callCue?.title ?? "",
+                },
+              )}
+            </p>
+            <div className="row">
+              <button type="button" disabled={busy} onClick={closeCall}>
+                {t("Cancel")}
+              </button>
+              <button
+                type="button"
+                className="primary"
+                disabled={busy || !callCue}
+                onClick={() => void submitCall()}
+              >
+                {command.status === "pending"
+                  ? t("Placing call…")
+                  : t("Place reminder call")}
+              </button>
+            </div>
+            <CommandNotice
+              status={command.status}
+              message={command.message}
+              retry={() =>
+                void command
+                  .retry<{ speakerId: string; queued: boolean }>()
+                  .then((result) => {
+                    if (result?.queued) {
+                      setCalledName(callSpeaker.displayName);
+                      setCallSpeaker(null);
+                      command.reset();
+                    }
+                  })
+              }
+            />
+          </>
+        )}
+      </Modal>
     </>
   );
 }

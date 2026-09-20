@@ -421,3 +421,41 @@ is no longer callable, and anything derived from them must be corrected before i
 Sweep result on 2026-09-19: no source file, config file, test or committed artifact names 2.5
 as the model in use. The only remaining mentions are the deliberate historical records in
 `docs/decisions.md` and `docs/measurements.md` that quote the provider's 404 and §7B itself.
+
+## 2026-09-20 - roadmap voice assistant is read-only
+
+The master report correctly excludes speech recognition and autonomous stage control from the
+MVP. Post-MVP roadmap work was explicitly requested after the MVP was completed, but that does
+not relax the permission or authority model. The first voice increment is therefore a read-only
+anchor aid:
+
+- Browser-provided speech recognition maps a small English, Hindi or Gujarati phrase set to one
+  of four deterministic intents: current cue, next cue, remaining time or help.
+- Answers come only from `renderOperationalCue` fields in the latest live published snapshot.
+  Generated host copy is never parsed for timing.
+- The assistant pauses on cached or stale data, and it degrades to the existing visual runbook
+  when browser speech recognition is unavailable.
+- Speech synthesis uses the selected interface locale when the browser/OS supplies a matching
+  voice. No telephony, third-party speech dependency, LLM call or backend route was added.
+- An anchor voice phrase cannot start, complete, repair or publish anything. Adding mutating
+  speech commands would require a separate authorized organizer design and server-authoritative
+  command path.
+
+## 2026-09-20 - speaker reminder agent starts as an owner-approved one-way call
+
+The roadmap's broad “AI speaker reminder / check-in agent” combines several materially different
+risks. The first increment is therefore a fixed, one-way Twilio reminder rather than an autonomous
+conversation:
+
+- Only the owner of a running live event can open a preview and explicitly place the call.
+- The message is deterministic, cannot alter the schedule and tells the speaker to contact the
+  organizer. It does not record audio or collect a response.
+- The optional E.164 contact stays in owner event state and is removed from every published anchor
+  snapshot. It expires with the event under the existing 72-hour retention rule.
+- The idempotency reservation is persisted before contacting Twilio. An ambiguous retry returns
+  the reservation/final response and does not dial again.
+- Provider calls use inline TwiML and the standard-library `fetch`; no dependency or public webhook
+  was added. The feature is disabled by default, and credentials must be Worker secrets.
+- Two-way speech/DTMF, proactive scheduling and other channels remain separate roadmap work. They
+  require a consent/status data model and validated Twilio webhook signatures before receiving any
+  response from a speaker.

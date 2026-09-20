@@ -1,5 +1,5 @@
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers'
-import { defineConfig } from 'vitest/config'
+import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+import { defineConfig } from 'vitest/config';
 
 // Real Durable Objects, real SQLite, real `transactionSync` inside workerd.
 // Nothing about the storage layer is mocked.
@@ -14,6 +14,10 @@ export default defineConfig({
           ALLOWED_ORIGINS: 'http://localhost:5173',
           GEMINI_MODEL: 'gemini-3.5-flash-lite',
           AI_ENABLED: 'false',
+          VOICE_REMINDERS_ENABLED: 'true',
+          TWILIO_ACCOUNT_SID: 'AC00000000000000000000000000000000',
+          TWILIO_AUTH_TOKEN: 'test-token-not-real',
+          TWILIO_FROM_NUMBER: '+15551234567',
           APP_ENV: 'test',
           BUILD_COMMIT: 'test',
         },
@@ -24,4 +28,4 @@ export default defineConfig({
     name: 'api',
     include: ['../../tests/api/**/*.test.ts'],
   },
-})
+});

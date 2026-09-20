@@ -143,6 +143,10 @@ export const errorCopy = (error: unknown): string => {
       return "Your session expired. Reload the page to sign in again.";
     case "DEMO_CAPACITY":
       return "This demo has reached its daily capacity. Try again tomorrow.";
+    case "VOICE_NOT_CONFIGURED":
+      return "Voice reminders are not configured yet.";
+    case "VOICE_PROVIDER_UNAVAILABLE":
+      return "The voice provider is unavailable. Try a new call later.";
     case "VALIDATION_FAILED":
       return humanize(error.message);
     case "NETWORK":
@@ -283,6 +287,7 @@ export type DraftBody = {
     id: string;
     displayName: string;
     pronunciationHint: string;
+    phoneE164?: string | undefined;
     facts: Array<{ id: string; text: string }>;
   }>;
   eventFacts: Array<{ id: string; text: string }>;
@@ -443,6 +448,18 @@ export const acknowledge = (
   call(`/events/${eventId}/ack`, {
     method: "POST",
     body: { publishedRevision },
+  });
+
+export const placeSpeakerReminderCall = (
+  eventId: string,
+  speakerId: string,
+  expectedRevision: number,
+  idempotencyKey: string,
+): Promise<{ speakerId: string; queued: boolean } | null> =>
+  call(`/events/${eventId}/speakers/${speakerId}/reminder-call`, {
+    method: "POST",
+    body: { expectedRevision },
+    idempotencyKey,
   });
 
 /** Approved script copy for the anchor. */

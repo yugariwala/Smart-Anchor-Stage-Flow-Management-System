@@ -1,6 +1,6 @@
 # Feature inventory
 
-Built on `main` at `42d3c5f`, 2026-09-19. **Status comes from the code**, not from a
+Audited on `main` through the 2026-09-20 speaker-reminder implementation. **Status comes from the code**, not from a
 completion report. Where the README and the source disagree, the source wins and the
 disagreement is listed at the end.
 
@@ -11,7 +11,7 @@ disagreement is listed at the end.
 | `npm run typecheck` | 0 errors |
 | `npm run lint` | pass |
 | `npm run build` | pass |
-| `npm test` | **330 passed / 330**, 19 files — domain 151, api 139, web 40 |
+| `npm test` | **344 passed / 344**, 23 files — domain 151, api 146, web 47 |
 | `npm run test:e2e` | **1 passed**, 52.5 s (recorded Playwright run against deployed Firebase + Cloudflare) |
 
 The API suite runs inside **real `workerd`** via `@cloudflare/vitest-pool-workers`, with real
@@ -99,6 +99,8 @@ an API test passing counts as "exercised on a running stack".
 | Offline snapshot cache + §11 stale label | web | **Verified** | `snapshot.test.tsx`; live worker-kill test | MUST | Recovered on restart |
 | Local countdown from server-clock offset | web | **Verified** | `snapshot.test.tsx`; live | MUST | `aria-hidden`; no write per second |
 | Live stage overview / readiness reminder | web | **Verified** | `apps/web/test/stage-readiness.test.tsx`; e2e (`Upcoming cue reminder`) | added-since | |
+| Read-only browser voice assistant | web | **Implemented** | `apps/web/test/voice-assistant.test.ts` (5 tests); full local check + production build | added-since | Answers current/next/remaining from structured state; action wording rejected; pauses on stale data. Real microphone and hosted browser run remain pending. |
+| Owner-approved one-way speaker reminder calls | API + web | **Implemented** | `tests/api/speaker-reminders.test.ts`, `tests/api/twilio-adapter.test.ts` (7 tests); full local check | added-since | Live owner only; explicit preview/confirmation; E.164 contact is stripped from anchor snapshots; reservation is recorded before dialing so a retry cannot call twice. Feature flag is off and no real provider call has been made. |
 | Printable runbook | web | **Verified** | hosted + local e2e; 2-page A4 PDF rendered with Poppler and visually inspected | MUST | Agenda header contrast fixed; blank third page removed; controls hidden and print-only facts/copy present |
 
 ## AI script pipeline
@@ -173,12 +175,12 @@ an API test passing counts as "exercised on a running stack".
 | Status | Count |
 |---|---|
 | **Verified** | 83 |
-| **Implemented** | 0 |
+| **Implemented** | 2 |
 | **Partial** | 1 |
 | **Stubbed** | 0 |
 | **Not built** | 1 |
 | **Cut** | 1 |
-| **Total** | 86 |
+| **Total** | 88 |
 
 ### MUST-tier completion
 
@@ -257,12 +259,8 @@ These exist and work but a judge reading only the README would miss them:
 2. **A formal screen-reader audit is still absent.** Keyboard traversal, focus restoration,
    reduced motion, non-colour status and live-region behavior now have automated evidence, but
    that is not equivalent to testing with VoiceOver, NVDA or another assistive reader.
-3. **The README's roadmap contradicts §5 and §8 in a way a judge can catch.** Its two
-   highest-priority roadmap items are an **AI voice anchor assistant** (speech-to-text) and an
-   **AI speaker reminder agent** contacting speakers by *"WhatsApp / SMS / email, optional voice
-   call"*. §8 lists speech-to-text voice commands, telephony check-in and automatic overrun
-   detection under **"STRETCH / ROADMAP — do not build now"**, and §5 records an explicit
-   decision: *"Phone-calling decision: NO for this 28-hour build"*, with reasons. Presenting
-   telephony as a high-priority next step directly reverses a documented decision. Either
-   re-frame those entries as the deliberate non-goals §5 says they are, or expect to defend the
-   reversal in Q&A.
+3. **Post-MVP voice work needs consent and provider validation.** The browser voice assistant is
+   read-only. The reminder caller is a post-MVP, owner-confirmed one-way message, disabled by
+   default and not exercised against a real provider. Do not describe it as an autonomous or
+   two-way AI agent. Interactive check-in still needs purpose-specific consent/status records,
+   signed webhook verification and a provider/legal review before implementation or deployment.

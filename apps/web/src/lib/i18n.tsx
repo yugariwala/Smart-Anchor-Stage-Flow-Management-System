@@ -273,6 +273,35 @@ const hi = {
   "Return to console": "कंसोल पर लौटें",
   "Schedule needs repair": "शेड्यूल में सुधार चाहिए",
   "Cached copy": "कैश की गई प्रति",
+  "Voice assistant": "आवाज़ सहायक",
+  "READ-ONLY VOICE ASSISTANT": "केवल-पढ़ने योग्य आवाज़ सहायक",
+  "Ask about the current cue, next cue, or time remaining. Voice cannot change the runbook.":
+    "वर्तमान संकेत, अगले संकेत या बचे समय के बारे में पूछें। आवाज़ रनबुक को बदल नहीं सकती।",
+  "Ask CuePilot": "CuePilot से पूछें",
+  "Listening…": "सुन रहा है…",
+  "Voice answers pause while the runbook is offline or stale.":
+    "रनबुक ऑफ़लाइन या पुरानी होने पर आवाज़ के उत्तर रुक जाते हैं।",
+  "Voice input is not supported in this browser.":
+    "इस ब्राउज़र में आवाज़ इनपुट समर्थित नहीं है।",
+  "Voice input could not start. Try again.":
+    "आवाज़ इनपुट शुरू नहीं हो सका। फिर प्रयास करें।",
+  "I couldn’t hear that. Try again.": "मैं वह सुन नहीं सका। फिर प्रयास करें।",
+  "You asked:": "आपने पूछा:",
+  "There is no active cue right now.": "अभी कोई सक्रिय संकेत नहीं है।",
+  "Current cue: {cue}.": "वर्तमान संकेत: {cue}।",
+  "Nothing further is scheduled.": "आगे कुछ निर्धारित नहीं है।",
+  "Up next: {cue}.": "अगला: {cue}।",
+  "There is no active cue to time.":
+    "समय बताने के लिए कोई सक्रिय संकेत नहीं है।",
+  "{minutes} minutes remain in {cue}.": "{cue} में {minutes} मिनट बाकी हैं।",
+  "{cue} has reached its forecast end.":
+    "{cue} अपने अनुमानित अंत पर पहुँच गया है।",
+  "{cue} is {minutes} minutes past its forecast end.":
+    "{cue} अपने अनुमानित अंत से {minutes} मिनट आगे है।",
+  "Ask what is current, what is next, or how much time remains.":
+    "पूछें कि अभी क्या है, अगला क्या है, या कितना समय बाकी है।",
+  "I didn’t understand. Ask about the current cue, next cue, or time remaining.":
+    "मैं समझ नहीं पाया। वर्तमान संकेत, अगले संकेत या बचे समय के बारे में पूछें।",
   "Approved script": "स्वीकृत स्क्रिप्ट",
   "No approved copy for this cue yet. The organizer drafts and approves host copy from the Scripts page; it appears here once approved.":
     "इस संकेत के लिए अभी स्वीकृत प्रति नहीं है। आयोजक स्क्रिप्ट पेज से संचालक प्रति बनाकर स्वीकृत करता है; स्वीकृति के बाद वह यहाँ दिखती है।",
@@ -424,6 +453,22 @@ const hi = {
   "Add speakers and approved facts in event setup.":
     "कार्यक्रम सेटअप में वक्ता और स्वीकृत तथ्य जोड़ें।",
   "No pronunciation hint added": "उच्चारण संकेत नहीं जोड़ा गया",
+  "Owner-approved speaker reminders": "मालिक द्वारा स्वीकृत वक्ता अनुस्मारक",
+  "Automated reminder calls are disabled in rehearsal mode.":
+    "रिहर्सल मोड में स्वचालित अनुस्मारक कॉल बंद हैं।",
+  "Each call requires your confirmation and plays a fixed one-way reminder. It cannot receive a response.":
+    "हर कॉल के लिए आपकी पुष्टि आवश्यक है और एक निश्चित एकतरफ़ा अनुस्मारक सुनाया जाता है। यह उत्तर प्राप्त नहीं कर सकती।",
+  "Reminder call queued for {speaker}.":
+    "{speaker} के लिए अनुस्मारक कॉल कतार में है।",
+  "Review reminder call": "अनुस्मारक कॉल की समीक्षा करें",
+  "Call {speaker}?": "{speaker} को कॉल करें?",
+  "This places an external automated call only after you confirm.":
+    "आपकी पुष्टि के बाद ही यह बाहरी स्वचालित कॉल करता है।",
+  "Number ending in {lastFour}": "{lastFour} पर समाप्त होने वाला नंबर",
+  "Hello {speaker}. This is an automated CuePilot reminder for {event}. Your segment, {cue}, is coming up. Please contact the organizer now to confirm you are ready. This call cannot receive a response.":
+    "नमस्ते {speaker}। यह {event} के लिए CuePilot का स्वचालित अनुस्मारक है। आपका सत्र, {cue}, आने वाला है। अपनी तैयारी की पुष्टि के लिए अभी आयोजक से संपर्क करें। यह कॉल उत्तर प्राप्त नहीं कर सकती।",
+  "Placing call…": "कॉल की जा रही है…",
+  "Place reminder call": "अनुस्मारक कॉल करें",
   "Approved facts": "स्वीकृत तथ्य",
   "No approved facts yet.": "अभी कोई स्वीकृत तथ्य नहीं।",
   "Event facts": "कार्यक्रम तथ्य",
@@ -599,6 +644,9 @@ const hi = {
   "Remove speaker {number}": "वक्ता {number} हटाएँ",
   "Full name": "पूरा नाम",
   "Pronunciation hint (optional)": "उच्चारण संकेत (वैकल्पिक)",
+  "Reminder phone (optional)": "अनुस्मारक फ़ोन (वैकल्पिक)",
+  "Include country code. This owner-only number is used only for an explicitly approved reminder call.":
+    "देश कोड शामिल करें। केवल मालिक को दिखने वाला यह नंबर सिर्फ स्पष्ट रूप से स्वीकृत अनुस्मारक कॉल के लिए उपयोग होता है।",
   "Unsaved changes": "असहेजे बदलाव",
   "Draft loaded": "ड्राफ्ट लोड हुआ",
   "Saving does not publish": "सहेजने से प्रकाशन नहीं होता",
@@ -990,6 +1038,35 @@ const gu: { [Key in keyof typeof hi]: string } = {
   "Return to console": "કન્સોલ પર પાછા ફરો",
   "Schedule needs repair": "શેડ્યૂલમાં સુધારો જરૂરી છે",
   "Cached copy": "કૅશ કરેલી નકલ",
+  "Voice assistant": "અવાજ સહાયક",
+  "READ-ONLY VOICE ASSISTANT": "ફક્ત વાંચી શકાય એવો અવાજ સહાયક",
+  "Ask about the current cue, next cue, or time remaining. Voice cannot change the runbook.":
+    "વર્તમાન સંકેત, આગળના સંકેત અથવા બાકી સમય વિશે પૂછો. અવાજ રનબુક બદલી શકતો નથી.",
+  "Ask CuePilot": "CuePilotને પૂછો",
+  "Listening…": "સાંભળી રહ્યું છે…",
+  "Voice answers pause while the runbook is offline or stale.":
+    "રનબુક ઑફલાઇન અથવા જૂની હોય ત્યારે અવાજના જવાબો થંભે છે.",
+  "Voice input is not supported in this browser.":
+    "આ બ્રાઉઝરમાં અવાજ ઇનપુટ સમર્થિત નથી.",
+  "Voice input could not start. Try again.":
+    "અવાજ ઇનપુટ શરૂ થઈ શક્યો નહીં. ફરી પ્રયાસ કરો.",
+  "I couldn’t hear that. Try again.":
+    "હું તે સાંભળી શક્યો નહીં. ફરી પ્રયાસ કરો.",
+  "You asked:": "તમે પૂછ્યું:",
+  "There is no active cue right now.": "અત્યારે કોઈ સક્રિય સંકેત નથી.",
+  "Current cue: {cue}.": "વર્તમાન સંકેત: {cue}.",
+  "Nothing further is scheduled.": "આગળ કંઈ નિર્ધારિત નથી.",
+  "Up next: {cue}.": "આગળ: {cue}.",
+  "There is no active cue to time.": "સમય જણાવવા માટે કોઈ સક્રિય સંકેત નથી.",
+  "{minutes} minutes remain in {cue}.": "{cue}માં {minutes} મિનિટ બાકી છે.",
+  "{cue} has reached its forecast end.":
+    "{cue} તેના અનુમાનિત અંતે પહોંચી ગયો છે.",
+  "{cue} is {minutes} minutes past its forecast end.":
+    "{cue} તેના અનુમાનિત અંતથી {minutes} મિનિટ આગળ છે.",
+  "Ask what is current, what is next, or how much time remains.":
+    "પૂછો કે અત્યારે શું છે, આગળ શું છે અથવા કેટલો સમય બાકી છે.",
+  "I didn’t understand. Ask about the current cue, next cue, or time remaining.":
+    "હું સમજી શક્યો નહીં. વર્તમાન સંકેત, આગળના સંકેત અથવા બાકી સમય વિશે પૂછો.",
   "Approved script": "મંજૂર સ્ક્રિપ્ટ",
   "No approved copy for this cue yet. The organizer drafts and approves host copy from the Scripts page; it appears here once approved.":
     "આ સંકેત માટે હજી મંજૂર નકલ નથી. આયોજક સ્ક્રિપ્ટ પેજ પરથી સંચાલક નકલ બનાવી મંજૂર કરે છે; મંજૂરી પછી તે અહીં દેખાય છે.",
@@ -1142,6 +1219,22 @@ const gu: { [Key in keyof typeof hi]: string } = {
   "Add speakers and approved facts in event setup.":
     "કાર્યક્રમ સેટઅપમાં વક્તાઓ અને મંજૂર તથ્યો ઉમેરો.",
   "No pronunciation hint added": "ઉચ્ચારણ સૂચન ઉમેર્યું નથી",
+  "Owner-approved speaker reminders": "માલિક દ્વારા મંજૂર વક્તા રિમાઇન્ડર",
+  "Automated reminder calls are disabled in rehearsal mode.":
+    "રિહર્સલ મોડમાં સ્વચાલિત રિમાઇન્ડર કૉલ બંધ છે.",
+  "Each call requires your confirmation and plays a fixed one-way reminder. It cannot receive a response.":
+    "દરેક કૉલ માટે તમારી પુષ્ટિ જરૂરી છે અને એક નક્કી કરેલું એકતરફી રિમાઇન્ડર વગાડે છે. તે જવાબ મેળવી શકતું નથી.",
+  "Reminder call queued for {speaker}.":
+    "{speaker} માટે રિમાઇન્ડર કૉલ કતારમાં છે.",
+  "Review reminder call": "રિમાઇન્ડર કૉલની સમીક્ષા કરો",
+  "Call {speaker}?": "{speaker}ને કૉલ કરશો?",
+  "This places an external automated call only after you confirm.":
+    "તમારી પુષ્ટિ પછી જ આ બાહ્ય સ્વચાલિત કૉલ કરે છે.",
+  "Number ending in {lastFour}": "{lastFour} પર સમાપ્ત થતો નંબર",
+  "Hello {speaker}. This is an automated CuePilot reminder for {event}. Your segment, {cue}, is coming up. Please contact the organizer now to confirm you are ready. This call cannot receive a response.":
+    "નમસ્તે {speaker}. આ {event} માટે CuePilotનું સ્વચાલિત રિમાઇન્ડર છે. તમારું સત્ર, {cue}, નજીક આવી રહ્યું છે. તમે તૈયાર છો તેની પુષ્ટિ કરવા હમણાં આયોજકનો સંપર્ક કરો. આ કૉલ જવાબ મેળવી શકતું નથી.",
+  "Placing call…": "કૉલ થઈ રહ્યો છે…",
+  "Place reminder call": "રિમાઇન્ડર કૉલ કરો",
   "Approved facts": "મંજૂર તથ્યો",
   "No approved facts yet.": "હજી મંજૂર તથ્યો નથી.",
   "Event facts": "કાર્યક્રમ તથ્યો",
@@ -1316,6 +1409,9 @@ const gu: { [Key in keyof typeof hi]: string } = {
   "Remove speaker {number}": "વક્તા {number} દૂર કરો",
   "Full name": "પૂરું નામ",
   "Pronunciation hint (optional)": "ઉચ્ચારણ સૂચન (વૈકલ્પિક)",
+  "Reminder phone (optional)": "રિમાઇન્ડર ફોન (વૈકલ્પિક)",
+  "Include country code. This owner-only number is used only for an explicitly approved reminder call.":
+    "દેશ કોડ ઉમેરો. ફક્ત માલિકને દેખાતો આ નંબર સ્પષ્ટ રીતે મંજૂર રિમાઇન્ડર કૉલ માટે જ વપરાય છે.",
   "Unsaved changes": "ન સાચવેલા ફેરફારો",
   "Draft loaded": "ડ્રાફ્ટ લોડ થયો",
   "Saving does not publish": "સાચવવાથી પ્રકાશન થતું નથી",

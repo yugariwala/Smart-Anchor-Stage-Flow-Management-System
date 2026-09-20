@@ -23,10 +23,7 @@ export const factIdSchema = z.string().min(1).max(ID_MAX);
 
 export const isoDateSchema = z
   .string()
-  .regex(
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/,
-    'must be UTC ISO-8601 ending in Z',
-  )
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/, 'must be UTC ISO-8601 ending in Z')
   .refine((s) => Number.isFinite(Date.parse(s)), 'must be a valid timestamp');
 
 export const languageSchema = z.enum(['en', 'hi', 'gu']);
@@ -70,6 +67,11 @@ export const organizerSpeakerSchema = z.object({
   id: idSchema,
   displayName: z.string().min(1).max(NAME_MAX),
   pronunciationHint: z.string().max(NAME_MAX),
+  phoneE164: z
+    .string()
+    .regex(/^\+[1-9]\d{7,14}$/, 'must be an E.164 number')
+    .or(z.literal(''))
+    .optional(),
   facts: z.array(organizerFactSchema).max(10),
 });
 
@@ -77,6 +79,11 @@ export const speakerSchema = z.object({
   id: idSchema,
   displayName: z.string().min(1).max(NAME_MAX),
   pronunciationHint: z.string().max(NAME_MAX), // optional content represented as ""
+  phoneE164: z
+    .string()
+    .regex(/^\+[1-9]\d{7,14}$/, 'must be an E.164 number')
+    .or(z.literal(''))
+    .optional(),
   facts: z.array(factSchema).max(10), // ten facts/speaker
 });
 
@@ -126,7 +133,9 @@ const contiguousOrder = (cues: readonly { order: number }[]): boolean => {
 export const cuesSchema = z
   .array(cueSchema)
   .max(20)
-  .refine(contiguousOrder, { message: 'cue order must be unique and contiguous 0..n-1' })
+  .refine(contiguousOrder, {
+    message: 'cue order must be unique and contiguous 0..n-1',
+  })
   .refine((cues) => cues.filter((c) => c.status === 'active').length <= 1, {
     message: 'at most one active cue',
   })
@@ -231,14 +240,22 @@ export const eventStateSchema = z
       const active = s.cues.find((c) => c.status === 'active');
       return active === undefined || active.id === s.currentCueId;
     },
-    { message: 'currentCueId must identify the active cue', path: ['currentCueId'] },
+    {
+      message: 'currentCueId must identify the active cue',
+      path: ['currentCueId'],
+    },
   );
 
 export const repairInputSchema = z.object({
   expectedRevision: z.int().min(1),
   activeForecastEndMin: z.int().min(0).max(HORIZON_MAX).nullable(),
   releaseUpdates: z
-    .array(z.object({ cueId: idSchema, notBeforeMin: z.int().min(0).max(HORIZON_MAX) }))
+    .array(
+      z.object({
+        cueId: idSchema,
+        notBeforeMin: z.int().min(0).max(HORIZON_MAX),
+      }),
+    )
     .max(20)
     .refine((u) => new Set(u.map((x) => x.cueId)).size === u.length, {
       message: 'releaseUpdates must not repeat a cueId',

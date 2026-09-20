@@ -66,6 +66,10 @@ export type Env = {
   AI_ENABLED: string;
   APP_ENV: string;
   BUILD_COMMIT: string;
+  VOICE_REMINDERS_ENABLED?: string;
+  TWILIO_ACCOUNT_SID?: string;
+  TWILIO_AUTH_TOKEN?: string;
+  TWILIO_FROM_NUMBER?: string;
 };
 
 /** Demonstration data lives 72 hours (§12). */
@@ -121,13 +125,29 @@ export type JoinCommand = MutationEnvelope & {
   readonly inviteCodeHash: string;
 };
 
-export type CommandResponse = { readonly status: number; readonly body: unknown };
+export type CommandResponse = {
+  readonly status: number;
+  readonly body: unknown;
+};
+
+export type SpeakerReminderReservation = {
+  readonly replay: CommandResponse | null;
+  readonly call: {
+    readonly to: string;
+    readonly speakerName: string;
+    readonly eventName: string;
+    readonly cueTitle: string;
+  } | null;
+};
 
 const createBodySchema = z.strictObject({
   name: z.string().min(1).max(120),
   startsAt: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/, 'must be UTC ISO-8601 ending in Z'),
+    .regex(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/,
+      'must be UTC ISO-8601 ending in Z',
+    ),
   hardEndMin: z.int().min(1).max(240),
   mode: z.enum(['rehearsal', 'live']),
   seed: z.enum(['blank', 'college-demo-v1']),
@@ -142,13 +162,18 @@ const draftBodySchema = z.strictObject({
   cues: z.array(draftCueInputSchema).max(20),
 });
 
-const expectedRevisionOnlySchema = z.strictObject({ expectedRevision: z.int().min(1) });
+const expectedRevisionOnlySchema = z.strictObject({
+  expectedRevision: z.int().min(1),
+});
 
 const rehearsalClockBodySchema = z.strictObject({
   expectedRevision: z.int().min(1),
   nowAt: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/, 'must be UTC ISO-8601 ending in Z'),
+    .regex(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/,
+      'must be UTC ISO-8601 ending in Z',
+    ),
 });
 
 const scriptProposalBodySchema = z.strictObject({
@@ -168,6 +193,10 @@ const announcementBodySchema = z.strictObject({
   expectedRevision: z.int().min(1),
   text: z.string().min(1).max(500),
   language: z.enum(['en', 'hi', 'gu']),
+});
+
+const speakerReminderBodySchema = z.strictObject({
+  expectedRevision: z.int().min(1),
 });
 
 type ProposalRow = {
@@ -215,7 +244,10 @@ export class EventRoom extends DurableObject<Env> {
    * Resolves the live event or throws. A non-member gets 404 with no revision, so another
    * event's revision can never leak. An anchor hitting an owner-only command gets 403.
    */
-  private requireAccess(uid: string, need: 'owner' | 'member'): { row: StateRow; state: EventState; role: Role } {
+  private requireAccess(
+    uid: string,
+    need: 'owner' | 'member',
+  ): { row: StateRow; state: EventState; role: Role } {
     const row = this.readStateRow();
     if (row === null || row.deleted_at !== null) {
       return throwApi('NOT_FOUND', 'Event not found.') as never;
@@ -233,7 +265,11 @@ export class EventRoom extends DurableObject<Env> {
   /** Ledger lookup. Runs FIRST inside every mutation, before any revision check. */
   private replayOrReject(env: MutationEnvelope): CommandResponse | null {
     const rows = this.ctx.storage.sql
-      .exec<{ request_hash: string; status_code: number; response_json: string }>(
+      .exec<{
+        request_hash: string;
+        status_code: number;
+        response_json: string;
+      }>(
         'SELECT request_hash, status_code, response_json FROM command_results WHERE uid = ? AND request_key = ?',
         env.uid,
         env.idempotencyKey,
@@ -247,7 +283,10 @@ export class EventRoom extends DurableObject<Env> {
         'That Idempotency-Key was already used with a different request body.',
       ) as never;
     }
-    return { status: hit.status_code, body: JSON.parse(hit.response_json) as unknown };
+    return {
+      status: hit.status_code,
+      body: JSON.parse(hit.response_json) as unknown,
+    };
   }
 
   private recordCommand(env: MutationEnvelope, response: CommandResponse): void {
@@ -264,11 +303,7 @@ export class EventRoom extends DurableObject<Env> {
 
   private requireRevision(row: StateRow, expected: number): void {
     if (row.revision !== expected) {
-      throwApi(
-        'REVISION_CONFLICT',
-        'The event changed. Refresh and preview again.',
-        row.revision,
-      );
+      throwApi('REVISION_CONFLICT', 'The event changed. Refresh and preview again.', row.revision);
     }
   }
 
@@ -302,9 +337,7 @@ export class EventRoom extends DurableObject<Env> {
     // EAGER staleness: any new revision invalidates every outstanding proposal, because each
     // was solved against an older base. Approval still re-checks (it is the authority); this
     // just keeps the table honest for a future proposals list.
-    this.ctx.storage.sql.exec(
-      "UPDATE proposals SET status = 'stale' WHERE status = 'proposed'",
-    );
+    this.ctx.storage.sql.exec("UPDATE proposals SET status = 'stale' WHERE status = 'proposed'");
   }
 
   /** Maps a domain rule refusal onto the HTTP error contract. */
@@ -360,7 +393,10 @@ export class EventRoom extends DurableObject<Env> {
   async create(cmd: CreateCommand): Promise<CommandResponse> {
     const parsed = createBodySchema.safeParse(cmd.body);
     if (!parsed.success) {
-      throwApi('VALIDATION_FAILED', `Invalid event body: ${parsed.error.issues[0]?.message ?? 'unknown'}`);
+      throwApi(
+        'VALIDATION_FAILED',
+        `Invalid event body: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+      );
     }
     const body = parsed.data;
 
@@ -417,7 +453,9 @@ export class EventRoom extends DurableObject<Env> {
         announcements: [],
         createdAt,
         updatedAt: createdAt,
-        expiresAt: new Date(Date.parse(createdAt) + RETENTION_MS).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        expiresAt: new Date(Date.parse(createdAt) + RETENTION_MS)
+          .toISOString()
+          .replace(/\.\d{3}Z$/, 'Z'),
       };
 
       // The seeded state must satisfy the same contract every other state does. A fixture
@@ -471,7 +509,11 @@ export class EventRoom extends DurableObject<Env> {
         'SELECT uid, revision, acknowledged_at FROM acknowledgments ORDER BY uid',
       )
       .toArray()
-      .map((a) => ({ uid: a.uid, revision: a.revision, acknowledgedAt: a.acknowledged_at }));
+      .map((a) => ({
+        uid: a.uid,
+        revision: a.revision,
+        acknowledgedAt: a.acknowledged_at,
+      }));
     return {
       status: 200,
       body: {
@@ -535,7 +577,10 @@ export class EventRoom extends DurableObject<Env> {
       // Draft saves do not publish: the pointer stays where it was.
       this.commitRevision(next, cmd.uid, 'draft', row.published_revision, cmd.nowIso);
 
-      const response: CommandResponse = { status: 200, body: { revision: next.revision, state: next } };
+      const response: CommandResponse = {
+        status: 200,
+        body: { revision: next.revision, state: next },
+      };
       this.recordCommand(cmd, response);
       return response;
     });
@@ -573,11 +618,23 @@ export class EventRoom extends DurableObject<Env> {
       const candidate = state.cues
         .slice()
         .sort((a, b) => a.order - b.order)
-        .map((c) => ({ cueId: c.id, startMin: c.plannedStartMin, endMin: c.plannedEndMin }));
-      const checks = validatePlan(state, candidate, { activeForecastEndMin: null, nowMin: 0 });
+        .map((c) => ({
+          cueId: c.id,
+          startMin: c.plannedStartMin,
+          endMin: c.plannedEndMin,
+        }));
+      const checks = validatePlan(state, candidate, {
+        activeForecastEndMin: null,
+        nowMin: 0,
+      });
       if (!planIsValid(checks)) {
-        const broke = checks.filter((c) => !c.passed).map((c) => `${c.rule}${c.cueId === null ? '' : `(${c.cueId})`}`);
-        return throwApi('VALIDATION_FAILED', `Cannot publish, rules violated: ${broke.join(', ')}`) as never;
+        const broke = checks
+          .filter((c) => !c.passed)
+          .map((c) => `${c.rule}${c.cueId === null ? '' : `(${c.cueId})`}`);
+        return throwApi(
+          'VALIDATION_FAILED',
+          `Cannot publish, rules violated: ${broke.join(', ')}`,
+        ) as never;
       }
 
       const revision = state.revision + 1;
@@ -602,7 +659,11 @@ export class EventRoom extends DurableObject<Env> {
   }
 
   /** `GET /v1/events/{id}/published?afterRevision=N` — member; 204 when unchanged. */
-  async getPublished(uid: string, afterRevision: number | null, nowIso: string): Promise<CommandResponse> {
+  async getPublished(
+    uid: string,
+    afterRevision: number | null,
+    nowIso: string,
+  ): Promise<CommandResponse> {
     this.sweepIfExpired(nowIso);
     const { row, state } = this.requireAccess(uid, 'member');
     if (row.published_revision === null) {
@@ -612,10 +673,96 @@ export class EventRoom extends DurableObject<Env> {
     if (afterRevision !== null && (row.published_revision as number) <= afterRevision) {
       return { status: 204, body: null };
     }
+    const publishedState: EventState = {
+      ...state,
+      // Phone numbers are owner-only operational data, never part of an anchor snapshot.
+      speakers: state.speakers.map(({ phoneE164: _phone, ...speaker }) => speaker),
+    };
     return {
       status: 200,
-      body: { state, publishedRevision: row.published_revision, serverNow: nowIso },
+      body: {
+        state: publishedState,
+        publishedRevision: row.published_revision,
+        serverNow: nowIso,
+      },
     };
+  }
+
+  /** Reserve one external reminder call before leaving the DO, so retries cannot dial twice. */
+  async reserveSpeakerReminder(
+    cmd: MutationEnvelope & { body: unknown; speakerId: string },
+  ): Promise<SpeakerReminderReservation> {
+    const parsed = speakerReminderBodySchema.safeParse(cmd.body);
+    if (!parsed.success) {
+      throwApi('VALIDATION_FAILED', 'Invalid body: expectedRevision is required.');
+    }
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replayOrReject(cmd);
+      if (replay !== null) return { replay, call: null };
+
+      const { row, state } = this.requireAccess(cmd.uid, 'owner');
+      this.requireRevision(row, parsed.data.expectedRevision);
+      if (state.mode !== 'live' || state.phase !== 'running') {
+        return throwApi(
+          'WRONG_PHASE',
+          'Reminder calls are available only while a live event is running.',
+        ) as never;
+      }
+      const speaker = state.speakers.find((item) => item.id === cmd.speakerId);
+      if (speaker === undefined) return throwApi('NOT_FOUND', 'No such speaker.') as never;
+      if (!/^\+[1-9]\d{7,14}$/.test(speaker.phoneE164 ?? '')) {
+        return throwApi(
+          'VALIDATION_FAILED',
+          'Add a valid E.164 reminder phone number before calling.',
+        ) as never;
+      }
+      const cue = state.cues
+        .filter((item) => item.speakerId === speaker.id && item.status !== 'completed')
+        .sort((a, b) => a.order - b.order)[0];
+      if (cue === undefined) {
+        return throwApi(
+          'WRONG_PHASE',
+          'This speaker has no active or upcoming cue to remind them about.',
+        ) as never;
+      }
+
+      // This 202 reservation is deliberately recorded before the network call. If the Worker
+      // disappears after dialing, replay returns "processing" instead of placing a duplicate.
+      this.recordCommand(cmd, {
+        status: 202,
+        body: { speakerId: speaker.id, queued: false },
+      });
+      return {
+        replay: null,
+        call: {
+          to: speaker.phoneE164 as string,
+          speakerName: speaker.displayName,
+          eventName: state.name,
+          cueTitle: cue.title,
+        },
+      };
+    });
+  }
+
+  /** Replace the reservation response after the provider returns; no event revision changes. */
+  async finishSpeakerReminder(
+    cmd: MutationEnvelope,
+    response: CommandResponse,
+  ): Promise<CommandResponse> {
+    return this.ctx.storage.transactionSync(() => {
+      const changed = this.ctx.storage.sql.exec(
+        'UPDATE command_results SET status_code = ?, response_json = ? WHERE uid = ? AND request_key = ? AND request_hash = ?',
+        response.status,
+        JSON.stringify(response.body),
+        cmd.uid,
+        cmd.idempotencyKey,
+        cmd.requestHash,
+      ).rowsWritten;
+      if (changed !== 1) {
+        return throwApi('INTERNAL', 'Reminder call reservation was lost.') as never;
+      }
+      return response;
+    });
   }
 
   /** `POST /v1/events/{id}/invitations` — plaintext secret returned exactly once. */
@@ -663,7 +810,11 @@ export class EventRoom extends DurableObject<Env> {
       const state = JSON.parse(row.state_json) as EventState;
 
       const rows = this.ctx.storage.sql
-        .exec<{ token_hash: string; expires_at: string; consumed_by: string | null }>(
+        .exec<{
+          token_hash: string;
+          expires_at: string;
+          consumed_by: string | null;
+        }>(
           'SELECT token_hash, expires_at, consumed_by FROM invitations WHERE token_hash = ?',
           cmd.inviteCodeHash,
         )
@@ -690,14 +841,21 @@ export class EventRoom extends DurableObject<Env> {
       );
 
       // Joining is an auxiliary record: it does not increment the event revision.
-      const response: CommandResponse = { status: 200, body: { role: 'anchor', eventId: state.id } };
+      const response: CommandResponse = {
+        status: 200,
+        body: { role: 'anchor', eventId: state.id },
+      };
       this.recordCommand(cmd, response);
       return response;
     });
   }
 
   /** `POST /v1/events/{id}/ack` — member. Does not increment the revision. */
-  async acknowledge(uid: string, publishedRevision: number, nowIso: string): Promise<CommandResponse> {
+  async acknowledge(
+    uid: string,
+    publishedRevision: number,
+    nowIso: string,
+  ): Promise<CommandResponse> {
     this.sweepIfExpired(nowIso);
     return this.ctx.storage.transactionSync(() => {
       const { row } = this.requireAccess(uid, 'member');
@@ -706,7 +864,10 @@ export class EventRoom extends DurableObject<Env> {
       }
       // Reject a future or unpublished revision. An older one is allowed and shown as behind.
       if (publishedRevision > (row.published_revision as number)) {
-        return throwApi('ACK_INVALID', 'Cannot acknowledge a revision that is not published.') as never;
+        return throwApi(
+          'ACK_INVALID',
+          'Cannot acknowledge a revision that is not published.',
+        ) as never;
       }
       this.ctx.storage.sql.exec(
         'INSERT INTO acknowledgments (uid, revision, acknowledged_at) VALUES (?, ?, ?) ' +
@@ -717,7 +878,10 @@ export class EventRoom extends DurableObject<Env> {
       );
       return {
         status: 200,
-        body: { acknowledgedRevision: publishedRevision, acknowledgedAt: nowIso },
+        body: {
+          acknowledgedRevision: publishedRevision,
+          acknowledgedAt: nowIso,
+        },
       };
     });
   }
@@ -733,7 +897,12 @@ export class EventRoom extends DurableObject<Env> {
     this.requireAccess(uid, 'owner');
     const capped = Math.min(Math.max(limit, 1), REVISION_PAGE_CAP);
     const rows = this.ctx.storage.sql
-      .exec<{ revision: number; action: string; actor_uid: string; created_at: string }>(
+      .exec<{
+        revision: number;
+        action: string;
+        actor_uid: string;
+        created_at: string;
+      }>(
         'SELECT revision, action, actor_uid, created_at FROM revisions WHERE revision < ? ORDER BY revision DESC LIMIT ?',
         before ?? Number.MAX_SAFE_INTEGER,
         capped + 1,
@@ -767,7 +936,10 @@ export class EventRoom extends DurableObject<Env> {
     }
     return {
       status: 200,
-      body: { revision, state: JSON.parse((found as { state_json: string }).state_json) as EventState },
+      body: {
+        revision,
+        state: JSON.parse((found as { state_json: string }).state_json) as EventState,
+      },
     };
   }
 
@@ -791,7 +963,6 @@ export class EventRoom extends DurableObject<Env> {
     });
   }
 
-
   // ───────────────────────── Milestone 3: repair proposals ─────────────────────────────
 
   /**
@@ -802,7 +973,9 @@ export class EventRoom extends DurableObject<Env> {
    * the organizer needs to see why, and §12 requires the published plan to be untouched
    * either way.
    */
-  async proposeRepair(cmd: MutationEnvelope & { body: unknown; proposalId: string }): Promise<CommandResponse> {
+  async proposeRepair(
+    cmd: MutationEnvelope & { body: unknown; proposalId: string },
+  ): Promise<CommandResponse> {
     const parsed = repairInputSchema.safeParse(cmd.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -899,13 +1072,19 @@ export class EventRoom extends DurableObject<Env> {
         return throwApi('PROPOSAL_EXPIRED', 'That preview expired. Preview again.') as never;
       }
       if (proposal.base_revision !== state.revision) {
-        this.ctx.storage.sql.exec("UPDATE proposals SET status = 'stale' WHERE id = ?", cmd.proposalId);
+        this.ctx.storage.sql.exec(
+          "UPDATE proposals SET status = 'stale' WHERE id = ?",
+          cmd.proposalId,
+        );
         return throwApi('PROPOSAL_STALE', 'The event changed. Preview again.') as never;
       }
 
       const stored = JSON.parse(proposal.result_json) as RepairResult;
       if (!stored.feasible) {
-        return throwApi('PROPOSAL_INFEASIBLE', 'An infeasible repair cannot be published.') as never;
+        return throwApi(
+          'PROPOSAL_INFEASIBLE',
+          'An infeasible repair cannot be published.',
+        ) as never;
       }
 
       const input = JSON.parse(proposal.input_json) as RepairInput;
@@ -936,11 +1115,10 @@ export class EventRoom extends DurableObject<Env> {
       // forever. The independent validator is what notices that the scenario minute has
       // passed the forecast end. Without this check an active-cue event could never go
       // stale, and the check above would pass vacuously on the fixture's main path.
-      const checks = validatePlan(
-        next,
-        recomputed.schedule,
-        { activeForecastEndMin: next.activeForecastEndMin, nowMin: currentMinute(next, cmd.nowIso) },
-      );
+      const checks = validatePlan(next, recomputed.schedule, {
+        activeForecastEndMin: next.activeForecastEndMin,
+        nowMin: currentMinute(next, cmd.nowIso),
+      });
       if (!planIsValid(checks)) {
         const broke = checks
           .filter((c) => !c.passed)
@@ -959,12 +1137,19 @@ export class EventRoom extends DurableObject<Env> {
         ) as never;
       }
 
-      this.ctx.storage.sql.exec("UPDATE proposals SET status = 'accepted' WHERE id = ?", cmd.proposalId);
+      this.ctx.storage.sql.exec(
+        "UPDATE proposals SET status = 'accepted' WHERE id = ?",
+        cmd.proposalId,
+      );
       this.commitRevision(next, cmd.uid, 'repair', next.revision, cmd.nowIso);
 
       const response: CommandResponse = {
         status: 200,
-        body: { revision: next.revision, publishedRevision: next.revision, state: next },
+        body: {
+          revision: next.revision,
+          publishedRevision: next.revision,
+          state: next,
+        },
       };
       this.recordCommand(cmd, response);
       return response;
@@ -974,7 +1159,9 @@ export class EventRoom extends DurableObject<Env> {
   // ───────────────────────── Milestone 3: cue and clock controls ───────────────────────
 
   /** `POST /v1/events/{id}/cues/{cid}/start` - owner. Server-derived actual start. */
-  async startCueCommand(cmd: MutationEnvelope & { body: unknown; cueId: string }): Promise<CommandResponse> {
+  async startCueCommand(
+    cmd: MutationEnvelope & { body: unknown; cueId: string },
+  ): Promise<CommandResponse> {
     return this.mutateRunning(cmd, (state) => ({
       next: this.runTransition(() => startCue(state, cmd.cueId, cmd.nowIso)),
       action: 'cue_start',
@@ -982,7 +1169,9 @@ export class EventRoom extends DurableObject<Env> {
   }
 
   /** `POST /v1/events/{id}/cues/{cid}/complete` - owner. Reality is recorded regardless. */
-  async completeCueCommand(cmd: MutationEnvelope & { body: unknown; cueId: string }): Promise<CommandResponse> {
+  async completeCueCommand(
+    cmd: MutationEnvelope & { body: unknown; cueId: string },
+  ): Promise<CommandResponse> {
     return this.mutateRunning(cmd, (state) => ({
       next: this.runTransition(() => completeCue(state, cmd.cueId, cmd.nowIso)),
       action: 'cue_complete',
@@ -1014,9 +1203,7 @@ export class EventRoom extends DurableObject<Env> {
     cmd: MutationEnvelope & { body: unknown },
     transition: (state: EventState) => { next: EventState; action: string },
   ): CommandResponse {
-    const parsed = z
-      .object({ expectedRevision: z.int().min(1) })
-      .safeParse(cmd.body);
+    const parsed = z.object({ expectedRevision: z.int().min(1) }).safeParse(cmd.body);
     if (!parsed.success) {
       throwApi('VALIDATION_FAILED', 'Invalid body: expectedRevision is required.');
     }
@@ -1046,7 +1233,11 @@ export class EventRoom extends DurableObject<Env> {
       this.commitRevision(next, cmd.uid, action, next.revision, cmd.nowIso);
       const response: CommandResponse = {
         status: 200,
-        body: { revision: next.revision, publishedRevision: next.revision, state: next },
+        body: {
+          revision: next.revision,
+          publishedRevision: next.revision,
+          state: next,
+        },
       };
       this.recordCommand(cmd, response);
       return response;
@@ -1080,15 +1271,12 @@ export class EventRoom extends DurableObject<Env> {
     };
   }
 
-
   // ─────────────────────── Milestone 5: script proposals ───────────────────────────────
 
   /** Reads the AI in-flight lease. An expired row is treated as absent. */
   private aiLeaseHeld(nowIso: string): boolean {
     const rows = this.ctx.storage.sql
-      .exec<{ reset_at: string }>(
-        "SELECT reset_at FROM counters WHERE counter_key = 'ai:inflight'",
-      )
+      .exec<{ reset_at: string }>("SELECT reset_at FROM counters WHERE counter_key = 'ai:inflight'")
       .toArray();
     const row = rows[0];
     return row !== undefined && Date.parse(row.reset_at) > Date.parse(nowIso);
@@ -1208,7 +1396,11 @@ export class EventRoom extends DurableObject<Env> {
             "VALUES (?, 'script', ?, ?, ?, ?, ?, ?, ?)",
           cmd.proposalId,
           prepared.baseRevision,
-          JSON.stringify({ ...request, promptVersion: PROMPT_VERSION, envelope }),
+          JSON.stringify({
+            ...request,
+            promptVersion: PROMPT_VERSION,
+            envelope,
+          }),
           JSON.stringify(outcome),
           stale ? 'stale' : 'proposed',
           cmd.uid,
@@ -1259,7 +1451,11 @@ export class EventRoom extends DurableObject<Env> {
    * review §7B requires. `humanEdited` records the other fact separately.
    */
   async approveScript(
-    cmd: MutationEnvelope & { body: unknown; proposalId: string; inputHash: string },
+    cmd: MutationEnvelope & {
+      body: unknown;
+      proposalId: string;
+      inputHash: string;
+    },
   ): Promise<CommandResponse> {
     const parsed = scriptApproveBodySchema.safeParse(cmd.body);
     if (!parsed.success) {
@@ -1360,7 +1556,11 @@ export class EventRoom extends DurableObject<Env> {
 
       const response: CommandResponse = {
         status: 200,
-        body: { revision: next.revision, scriptId: script.id, publishedRevision },
+        body: {
+          revision: next.revision,
+          scriptId: script.id,
+          publishedRevision,
+        },
       };
       this.recordCommand(cmd, response);
       return response;
@@ -1417,7 +1617,11 @@ export class EventRoom extends DurableObject<Env> {
 
       const response: CommandResponse = {
         status: 200,
-        body: { revision: next.revision, announcementId: announcement.id, publishedRevision },
+        body: {
+          revision: next.revision,
+          announcementId: announcement.id,
+          publishedRevision,
+        },
       };
       this.recordCommand(cmd, response);
       return response;

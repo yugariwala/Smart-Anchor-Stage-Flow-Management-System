@@ -37,6 +37,8 @@ export type ErrorCode =
   | 'VALIDATION_FAILED'
   | 'NOT_IMPLEMENTED'
   | 'DEMO_CAPACITY'
+  | 'VOICE_NOT_CONFIGURED'
+  | 'VOICE_PROVIDER_UNAVAILABLE'
   | 'PAYLOAD_TOO_LARGE'
   | 'ORIGIN_NOT_ALLOWED'
   | 'INTERNAL';
@@ -71,6 +73,8 @@ const STATUS: Record<ErrorCode, number> = {
   VALIDATION_FAILED: 422,
   NOT_IMPLEMENTED: 422,
   DEMO_CAPACITY: 429,
+  VOICE_NOT_CONFIGURED: 503,
+  VOICE_PROVIDER_UNAVAILABLE: 503,
   INTERNAL: 500,
 };
 
@@ -79,6 +83,7 @@ const RETRYABLE: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
   // not a failure. The UI renders "waiting for the organizer to publish" and polls again.
   'NOT_PUBLISHED',
   'DEMO_CAPACITY',
+  'VOICE_PROVIDER_UNAVAILABLE',
 ]);
 
 export class ApiError extends Error {
@@ -101,7 +106,12 @@ export class ApiError extends Error {
   }
 
   toBody(): {
-    error: { code: ErrorCode; message: string; currentRevision?: number; retryable: boolean };
+    error: {
+      code: ErrorCode;
+      message: string;
+      currentRevision?: number;
+      retryable: boolean;
+    };
   } {
     return {
       error: {

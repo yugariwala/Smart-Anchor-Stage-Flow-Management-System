@@ -12,6 +12,7 @@
     "ALLOWED_ORIGINS": "http://localhost:5173",
     "GEMINI_MODEL": "gemini-3.5-flash-lite",
     "AI_ENABLED": "false",
+    "VOICE_REMINDERS_ENABLED": "false",
     "APP_ENV": "dev",
     "BUILD_COMMIT": "dev"
   },
@@ -22,7 +23,10 @@
         "FIREBASE_PROJECT_ID": "smart-anchor-stage-flow-system",
         "ALLOWED_ORIGINS": "https://smart-anchor-stage-flow-system.web.app,https://smart-anchor-stage-flow-system.firebaseapp.com",
         "GEMINI_MODEL": "gemini-3.5-flash-lite",
-        "AI_ENABLED": "true",
+        // Zero-cost safety default. Enable only after the owner deliberately accepts the
+        // Gemini project's billing/quota settings.
+        "AI_ENABLED": "false",
+        "VOICE_REMINDERS_ENABLED": "false",
         "APP_ENV": "production",
         "BUILD_COMMIT": "7a1457a"
       },

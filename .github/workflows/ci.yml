@@ -1,8 +1,7 @@
 name: CI
 
 on:
-  push:
-  pull_request:
+  # Manual-only: CI cannot consume metered runner minutes without an explicit action.
   workflow_dispatch:
 
 permissions:

@@ -18,6 +18,8 @@ export type Speaker = {
   id: UUID;
   displayName: string;
   pronunciationHint: string; // optional content represented as ""
+  /** Owner-only contact data. Omitted from anchor-facing published snapshots. */
+  phoneE164?: string | undefined;
   facts: Fact[]; // only facts the organizer approved
 };
 
