@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
-// These tests use actual Firebase anonymous authentication and the existing local Worker.
-// No API responses are intercepted or replaced. Run both servers before this suite.
+// These tests use actual Firebase anonymous authentication and the configured Worker.
+// No API responses are intercepted or replaced. For local runs, start both servers first.
 test("complete organizer and anchor rehearsal, recovery, history, responsive layouts and deletion", async ({
   page,
   browser,
@@ -12,6 +12,18 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   await expect(
     page.getByRole("heading", { name: "Your events", exact: true }),
   ).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(
+    await page.evaluate(() => {
+      const style = getComputedStyle(document.documentElement);
+      return [
+        style.animationName,
+        style.transitionDuration,
+        style.scrollBehavior,
+      ];
+    }),
+  ).toEqual(["none", "0s", "auto"]);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.screenshot({
     path: "apps/web/test-results/workspace-desktop.png",
     fullPage: true,
@@ -32,6 +44,32 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   const match = page.url().match(/event\/([^/]+)\/setup/);
   expect(match).not.toBeNull();
   const eventId = match![1];
+  await page.getByRole("button", { name: "Agenda · 0", exact: true }).click();
+  await page.getByRole("button", { name: "Import CSV", exact: true }).click();
+  const csvDialog = page.getByRole("dialog", {
+    name: "Import an agenda from CSV",
+  });
+  await csvDialog.getByLabel("CSV file").setInputFiles({
+    name: "browser-import.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      [
+        "title,speaker,preferred_duration_min,min_duration_min,compression_penalty,buffer_before_min,available_from_min,fixed_start_min",
+        "Imported welcome,CSV Speaker,6,4,2,1,,",
+      ].join("\n"),
+    ),
+  });
+  await expect(
+    csvDialog.getByRole("region", { name: "Import preview" }),
+  ).toContainText("Imported welcome");
+  await csvDialog
+    .getByRole("button", { name: "Add 1 cue", exact: true })
+    .click();
+  await expect(page.getByLabel("Cue title")).toHaveCount(1);
+  await expect(page.getByLabel("Cue title")).toHaveValue("Imported welcome");
+  await page
+    .getByRole("button", { name: "Event details", exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Load scenario", exact: true })
     .click();
@@ -77,18 +115,37 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   await page
     .getByRole("button", { name: "Start Opening remarks", exact: true })
     .click();
+  await expect(
+    page.getByRole("button", { name: "Complete Opening remarks", exact: true }),
+  ).toBeVisible();
+  const eventClock = page
+    .locator(".console-metrics > div")
+    .filter({ hasText: "Event clock" })
+    .locator("strong");
+  const beforeOpeningClock = await eventClock.innerText();
   await page.getByRole("button", { name: "+5 min", exact: true }).click();
+  await expect(eventClock).not.toHaveText(beforeOpeningClock);
   await page
     .getByRole("button", { name: "Complete Opening remarks", exact: true })
     .click();
+  await expect(
+    page.getByRole("button", { name: "Start Keynote", exact: true }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Start Keynote", exact: true })
     .click();
   await expect(
+    page.getByRole("button", { name: "Complete Keynote", exact: true }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("region", { name: "Live stage overview" }),
   ).toBeVisible();
+  const beforeTenMinutes = await eventClock.innerText();
   await page.getByRole("button", { name: "+10 min", exact: true }).click();
+  await expect(eventClock).not.toHaveText(beforeTenMinutes);
+  const beforeFiveMinutes = await eventClock.innerText();
   await page.getByRole("button", { name: "+5 min", exact: true }).click();
+  await expect(eventClock).not.toHaveText(beforeFiveMinutes);
   const reminder = page.getByRole("complementary", {
     name: "Upcoming cue reminder",
   });
@@ -230,6 +287,22 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   await expect(
     page.getByRole("heading", { name: "Your events", exact: true }),
   ).toBeVisible();
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement)
+      document.activeElement.blur();
+  });
+  const skipLink = page.getByRole("link", { name: "Skip to content" });
+  for (
+    let i = 0;
+    i < 30 &&
+    !(await skipLink.evaluate((node) => node === document.activeElement));
+    i += 1
+  ) {
+    await page.keyboard.press("Tab");
+  }
+  await expect(skipLink).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#main-content")).toBeFocused();
   await page.screenshot({
     path: "apps/web/test-results/workspace-mobile.png",
     fullPage: true,
@@ -263,6 +336,19 @@ test("complete organizer and anchor rehearsal, recovery, history, responsive lay
   await expect(
     anchor.getByRole("heading", { name: "All approved host copy" }),
   ).toBeVisible();
+  await expect(
+    anchor.getByRole("heading", { name: "Speaker pronunciation & facts" }),
+  ).toBeVisible();
+  await expect(
+    anchor.getByRole("button", { name: "Refresh runbook" }),
+  ).toBeHidden();
+  const printPdf = await anchor.pdf({
+    path: "apps/web/test-results/anchor-runbook-print.pdf",
+    format: "A4",
+    printBackground: true,
+  });
+  expect(printPdf.subarray(0, 4).toString()).toBe("%PDF");
+  expect(printPdf.length).toBeGreaterThan(10_000);
 
   await page.goto(`/#/event/${eventId}/settings`);
   await page.getByRole("button", { name: "Delete event", exact: true }).click();

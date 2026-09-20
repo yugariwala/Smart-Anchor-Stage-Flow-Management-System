@@ -7,6 +7,10 @@ approved revision to every screen at once — or refuses, with the shortage quan
 This repository is the implementation for the *Smart Anchor / Stage Flow Management System*
 problem statement.
 
+**Live demo:** https://smart-anchor-stage-flow-system.web.app
+
+**Production API:** https://cuepilot-api-production.cuepilot-api.workers.dev/v1/health
+
 ## Screenshots
 
 The organizer console is the centre of the product: current activity, live agenda, the repair
@@ -49,10 +53,9 @@ every hard-rule check — and the shortage quantified when no feasible plan exis
 
 ## Features and progress
 
-Milestones **M0–M5 are complete**; **M6 is partially complete**. Roughly **90–95%** of the
-specified scope is implemented, with the remainder being an accessibility/localisation polish
-pass rather than product functionality. Planned next-step enhancements are listed in the
-[roadmap](#roadmap--planned-enhancements).
+The core product, production deployment, performance sample and browser accessibility checks are
+complete. Remaining validation is native-speaker review; interface localisation remains planned.
+Next-step enhancements are listed in the [roadmap](#roadmap--planned-enhancements).
 
 | # | Milestone | Progress |
 |---|---|---|
@@ -64,8 +67,9 @@ pass rather than product functionality. Planned next-step enhancements are liste
 | M4 | Organizer console, anchor view, setup screen, repair preview | Complete |
 | M5 | Gemini script proposals + approval, template fallback, announcements | Complete |
 | M6 | Offline snapshot cache, countdown offset, printable runbook | Complete |
-| M6 | Accessibility pass (focus management, live regions, keyboard) | Partial |
+| M6 | Accessibility pass (focus management, live regions, keyboard, reduced motion) | Complete |
 | M6 | Full UI localisation (multilingual copy generation already works) | Planned |
+| Deployment | Firebase Hosting + Cloudflare Worker + production Gemini secret | Complete |
 
 Feature-level status:
 
@@ -95,9 +99,10 @@ Feature-level status:
 | UX | 2s visibility-aware polling with live/amber/stale freshness and backoff | Complete |
 | UX | Offline snapshot cache with the labelled stale view | Complete |
 | UX | Printable runbook (approved copy + speaker facts) | Complete |
-| UX | Accessibility polish (focus traps, live regions, non-colour cues) | Partial |
+| UX | Accessibility polish (focus traps, live regions, non-colour cues) | Complete |
 | UX | Localised interface chrome | Planned |
 | Quality | Domain tests on node, API tests in real `workerd`, Playwright browser e2e | Complete |
+| Deployment | Hosted frontend, authenticated Worker, production CORS and real Gemini response | Complete |
 
 ## Roadmap — planned enhancements
 
@@ -170,7 +175,8 @@ npm test            # vitest run: domain on node, API in real workerd
 npm run test:e2e    # Playwright browser suite
 npm run check       # typecheck + lint + test
 npm run build       # every workspace
-npm run deploy:api  # wrangler deploy
+npm run deploy:api  # Cloudflare production Worker
+npm run deploy:web  # production build + Firebase Hosting
 ```
 
 > Do **not** run `npm audit fix --force`. It downgrades `@cloudflare/vitest-pool-workers` and

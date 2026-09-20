@@ -16,6 +16,25 @@
     "BUILD_COMMIT": "dev"
   },
 
+  "env": {
+    "production": {
+      "vars": {
+        "FIREBASE_PROJECT_ID": "smart-anchor-stage-flow-system",
+        "ALLOWED_ORIGINS": "https://smart-anchor-stage-flow-system.web.app,https://smart-anchor-stage-flow-system.firebaseapp.com",
+        "GEMINI_MODEL": "gemini-3.5-flash-lite",
+        "AI_ENABLED": "true",
+        "APP_ENV": "production",
+        "BUILD_COMMIT": "7a1457a"
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "EVENT_ROOMS", "class_name": "EventRoom" },
+          { "name": "QUOTA_ROOMS", "class_name": "QuotaRoom" }
+        ]
+      }
+    }
+  },
+
   "durable_objects": {
     "bindings": [
       { "name": "EVENT_ROOMS", "class_name": "EventRoom" },

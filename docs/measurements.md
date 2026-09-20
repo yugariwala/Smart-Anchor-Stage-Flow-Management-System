@@ -55,6 +55,7 @@ actual project; do not spend hours switching models."* `GEMINI_MODEL` is now
 
 | Run | Date (UTC) | Model | Result |
 |---|---|---|---|
+| Production success | 2026-09-19T18:20:44Z | `gemini-3.5-flash-lite` | **4 of 4** drafts came from the deployed model, all schema-valid; opening approved |
 | Success | 2026-09-19T12:17:11Z | `gemini-3.5-flash-lite` | **4 of 4** drafts came from the model, all schema-valid |
 | Forced failure | 2026-09-19T12:15:08Z | `gemini-2.5-flash-lite` (404) | **0 of 4** from the model; 4 of 4 fell back to a labelled template, `fallbackReason: "provider returned 404"` |
 
@@ -73,6 +74,10 @@ actually supplied — no fabricated references in this sample of four.
 The `opening` draft was **approved through the real endpoint** and landed in the published
 snapshot, so the full generate → review → approve → publish round trip is proven, not just the
 provider call.
+
+The production run used `https://cuepilot-api-production.cuepilot-api.workers.dev/v1`, a real
+anonymous Firebase identity, Cloudflare Durable Objects and the Worker secret. The deployed
+event was `67386070-1652-4640-bfce-c34c43f89da1`; no credential was printed by the runner.
 
 Sample output (`introduction`, verbatim):
 
@@ -98,12 +103,50 @@ template was used. **A template is never reported as an AI success.**
 - **Not faithfulness.** Schema validity and resolvable fact ids do not prove the words are
   true to the facts (§7B). Human review remains the gate; these four were read by one
   reviewer and are fictional content throughout.
-- **Not Hindi or Gujarati quality.** The four recorded drafts are English. Any hi/gu output
+- **Not Hindi or Gujarati quality.** The production timing sample exercised every required
+  kind/language combination, but response success is not a language review. Any hi/gu output
   must carry "generated; language quality unverified" until a qualified reviewer sees it
   (§18), and the templates already attach that warning automatically.
-- **Not latency.** These runs were not timed. The §18 script-response target (12 s) remains
-  NOT YET MEASURED.
 - **Not a rate-limit measurement.** One run of four requests says nothing about quotas.
+
+### Deployed release gates (2026-09-19 UTC)
+
+`npm run measure:production` used real anonymous Firebase identities, disposable six-cue
+rehearsal events, the deployed Worker and its production Gemini secret. It prints no token,
+invite code or generated body. Percentiles use the nearest-rank method.
+
+| Metric | Sample | Result | Target | Outcome |
+|---|---:|---:|---:|---|
+| Repair client round-trip | 30 previews | min 186 ms; p50 231 ms; **p95 377 ms**; max 433 ms | p95 < 500 ms | **Pass** |
+| Worker CPU, top-level request | same 30 previews | p95 2 ms; max 2 ms | < 10 ms/invocation | **Pass** |
+| `EventRoom` CPU, repair RPC | same 30 previews | p95 3 ms; max 3 ms | < 10 ms/invocation | **Pass** |
+| Combined Worker + `EventRoom` CPU | paired same 30 previews | **p95 4 ms; max 5 ms** | < 10 ms/request | **Pass** |
+| Publication freshness, send → visible | 20 updates, two identities, 2 s polling | min 389 ms; p50 1,221 ms; **p95 2,033 ms**; max 2,099 ms | p95 ≤ 3 s | **Pass** |
+| Publication freshness, owner response → visible | same 20 updates | min 286 ms; p50 1,076 ms; **p95 1,929 ms**; max 1,985 ms | informational | — |
+| Script response, all sources | 20 attempts | min 392 ms; p50 1,125 ms; **p95 2,064 ms**; max 2,102 ms | ≤ 12 s | **Pass** |
+| Script response, Gemini only | 17 attempts | min 991 ms; p50 1,228 ms; p95/max 2,102 ms | ≤ 12 s | **Pass** |
+| Script response, labelled fallback | 3 attempts | min 392 ms; p50 752 ms; p95/max 811 ms | ≤ 12 s | **Pass** |
+
+The 20 script attempts covered all 12 combinations of opening, introduction, transition and
+closing with `en`, `hi` and `gu`. Seventeen returned from `gemini-3.5-flash-lite`; three
+returned the labelled deterministic template. This establishes availability and response
+time, not language faithfulness.
+
+Cloudflare live-tail telemetry supplied `cpuTime` separately for the top-level Worker and the
+`EventRoom` Durable Object. Pairing the two invocations for each request gives the combined
+figures above. JWT verification and routing both occur in the top-level figure; the platform
+does not split them into independent timers.
+
+The API does not emit `Server-Timing`, so server execution cannot be derived from HTTP headers.
+Cloudflare CPU telemetry is the server-side measurement; client round-trip is recorded
+separately as required.
+
+#### Repeatability note
+
+Four additional 30-request repair batches produced p95 values of 2,335 ms, 342 ms, 288 ms and
+137 ms. The initial cold/noisy batch failed the 500 ms target; all four immediate repeats
+passed. The release-gate row uses the final batch correlated with CPU telemetry, but the first
+batch is retained here because a single warm result must not be presented as universal latency.
 
 ### Contrast, re-measured against the shipped palette (2026-09-19)
 
@@ -131,17 +174,29 @@ markup uses. It does **not** cover Radix Themes' built-in component palettes
 (`accentColor="teal"`, `grayColor="sage"`), which ship their own colours; those have not been
 measured here. As §20 says, none of this amounts to a formal accessibility certification.
 
+### Browser accessibility and print verification (2026-09-20)
+
+The complete organizer-and-anchor Playwright rehearsal passed against the hosted app and again
+against the local build containing the final print fixes.
+
+| Check | Evidence |
+|---|---|
+| Reduced motion | Chromium emulated `prefers-reduced-motion: reduce`; computed values were `animation-name: none`, `transition-duration: 0s`, `scroll-behavior: auto` |
+| Keyboard skip path | Repeated Tab traversal reached `Skip to content`; Enter moved focus to `#main-content` |
+| Dialog focus | Escape closed the mobile navigation dialog and restored focus to its opener |
+| Print visibility | Interactive controls were hidden; complete agenda, approved host copy, pronunciation and facts were visible |
+| PDF output | Playwright generated a 2-page A4 PDF; Poppler rendered both pages for visual inspection |
+
+The visual pass found and fixed an unreadable agenda header and a footer that created an
+otherwise blank third page. The final two-page rendering has no clipped text, overlap or stray
+background region. This is browser and visual evidence, not a formal screen-reader audit.
+
 ## NOT YET MEASURED
 
-These are the §18 targets. They are targets, not results, and stay in this section until a
-real sample exists.
+These §18 targets still require evidence.
 
 | Metric | Target | Planned method | Status |
 |---|---|---|---|
-| Repair latency, p95 end-to-end on the six-cue fixture | < 500 ms | 30 deployed requests; record browser-to-response and server timing separately | **NOT YET MEASURED** (H19) |
-| Worker CPU per request (JWT verify + routing) | must fit the 10 ms free-plan limit | Sample the deployed Worker; separate verify from routing | **NOT YET MEASURED** (H19) |
-| Publication freshness, p95 | ≤ 3 s on healthy visible tabs | 20 publishes between two sessions, same event revision | **NOT YET MEASURED** |
-| Script response time | valid draft or explicit fallback within 12 s | 20 attempts; report success and fallback counts separately | **NOT YET MEASURED** — two runs of four completed well inside the deadline but were not timed |
 | Script faithfulness | zero unsupported claims in the reviewed sample | human review of ≥12 drafts; state reviewer language competence | **NOT YET MEASURED** — 4 English drafts reviewed so far, target is ≥12 across kinds and languages |
 | Judge usability | first repair within five minutes | external testers; report the actual count, imply no study | **NOT YET MEASURED** |
 | Cost | ₹0 during build and demo | billing configuration and usage dashboard check | **NOT YET MEASURED** |

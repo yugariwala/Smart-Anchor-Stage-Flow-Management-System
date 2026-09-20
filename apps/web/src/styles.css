@@ -1755,6 +1755,12 @@ tr.changed > * {
   @page {
     margin: 15mm;
   }
+  html,
+  body,
+  .app-shell,
+  .main-shell {
+    background: white !important;
+  }
   .sidebar,
   .topbar,
   .no-print,
@@ -1764,6 +1770,7 @@ tr.changed > * {
   }
   .app-shell {
     display: block;
+    min-height: 0;
   }
   .anchor,
   .anchor-now {
@@ -1811,11 +1818,27 @@ tr.changed > * {
   .anchor .table-scroll td {
     color: #17251e !important;
   }
+  .anchor .table-scroll thead th {
+    background: white !important;
+    border-bottom: 1px solid #999;
+  }
   .print-only {
     display: block;
   }
   .print-only article {
     break-inside: avoid;
+    margin-block: 8px;
+  }
+  .print-only h2 {
+    margin: 16px 0 8px;
+  }
+  .print-only h3,
+  .print-only p,
+  .print-only ul {
+    margin-block: 4px;
+  }
+  .anchor footer {
+    margin-bottom: 0;
   }
   .anchor-title {
     font-size: 24pt;

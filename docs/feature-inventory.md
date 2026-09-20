@@ -12,7 +12,7 @@ disagreement is listed at the end.
 | `npm run lint` | pass |
 | `npm run build` | pass |
 | `npm test` | **330 passed / 330**, 19 files — domain 151, api 139, web 40 |
-| `npm run test:e2e` | **1 passed**, 44.9 s (Playwright, real Chromium, both servers live) |
+| `npm run test:e2e` | **1 passed**, 50.1 s (Playwright against deployed Firebase + Cloudflare) |
 
 The API suite runs inside **real `workerd`** via `@cloudflare/vitest-pool-workers`, with real
 Durable Objects, real SQLite and a real `transactionSync`. Nothing about storage is mocked, so
@@ -57,7 +57,7 @@ an API test passing counts as "exercised on a running stack".
 | Mass-assignment prevention on draft input | API + domain | **Verified** | `permissions.test.ts` (4 tests) | MUST | Strict schemas; `materializeDraftCues` is the only path to a `Cue` |
 | Speakers, pronunciation hints, approved facts | API + web | **Verified** | `permissions.test.ts`; e2e; `/event/:id/speakers` | MUST | |
 | Inline validation from the shared Zod schemas | web | **Verified** | `apps/web/test/setup.test.tsx`; e2e | MUST | Same schemas the server enforces |
-| CSV agenda import | web | **Implemented** | `apps/web/src/lib/csvAgenda.ts`, `apps/web/test/csv-agenda.test.ts` | SHOULD | Unit-tested; **not** exercised by the e2e or any live run |
+| CSV agenda import | web | **Verified** | `apps/web/test/csv-agenda.test.ts`; hosted e2e imports, previews and applies a CSV cue | SHOULD | Exercised against the deployed Firebase frontend and production Worker |
 | One-click fictional rehearsal (`college-demo-v1`) | API + web | **Verified** | `tests/api/demo-seed.test.ts`; `apps/web/test/load-rehearsal.test.ts`; e2e (`Load scenario`) | MUST | Guarded: rehearsal mode only, hard finish ≥ 60 |
 
 ## Scheduling & repair
@@ -99,7 +99,7 @@ an API test passing counts as "exercised on a running stack".
 | Offline snapshot cache + §11 stale label | web | **Verified** | `snapshot.test.tsx`; live worker-kill test | MUST | Recovered on restart |
 | Local countdown from server-clock offset | web | **Verified** | `snapshot.test.tsx`; live | MUST | `aria-hidden`; no write per second |
 | Live stage overview / readiness reminder | web | **Verified** | `apps/web/test/stage-readiness.test.tsx`; e2e (`Upcoming cue reminder`) | added-since | |
-| Printable runbook | web | **Implemented** | `@media print` blocks in `apps/web/src/styles.css`; `AnchorView.tsx` | MUST | Print stylesheet exists; **no test and no verified print run** |
+| Printable runbook | web | **Verified** | hosted + local e2e; 2-page A4 PDF rendered with Poppler and visually inspected | MUST | Agenda header contrast fixed; blank third page removed; controls hidden and print-only facts/copy present |
 
 ## AI script pipeline
 
@@ -141,10 +141,10 @@ an API test passing counts as "exercised on a running stack".
 | Feature | Layer | Status | Evidence | Tier | Notes |
 |---|---|---|---|---|---|
 | Measured contrast (23/23 pairs pass) | web | **Verified** | `apps/web/scripts/contrast.mjs`; `docs/measurements.md` | MUST | Measured, not asserted; Radix's own component palettes are **not** covered |
-| Keyboard reachability, visible focus, focus return | web | **Implemented** | `UI.tsx` dialog focus handling; e2e navigates by role | MUST | No dedicated a11y assertion suite; not audited with a screen reader |
+| Keyboard reachability, visible focus, focus return | web | **Verified** | e2e Tab traversal to skip link, Enter to main, Escape + opener focus restoration | MUST | Exercised in Chrome; not a formal screen-reader audit |
 | Non-colour status (text + shape on every chip) | web | **Verified** | `styles.css`; e2e reads chips by text | MUST | |
 | Polite live region on new revision, `aria-hidden` countdown | web | **Verified** | `snapshot.test.tsx`; `AnchorView.tsx` | MUST | Not a per-second announcement |
-| Reduced-motion respected | web | **Implemented** | `@media (prefers-reduced-motion: reduce)` in `styles.css` | MUST | Not tested |
+| Reduced-motion respected | web | **Verified** | e2e emulates `reduce` and asserts computed animation, transition and scroll behavior | MUST | Native media emulation against the running app |
 | Mobile-portrait anchor, desktop console | web | **Verified** | e2e captures `anchor-mobile.png` at mobile viewport | MUST | |
 | Script language selection (en / hi / gu) | web | **Verified** | `script-review.test.tsx`; e2e (`Kind`, language select) | MUST | |
 | Localised **interface chrome** | web | **Not built** | — | SHOULD | Only host copy is multilingual; UI chrome is English. README lists it as Planned |
@@ -154,17 +154,17 @@ an API test passing counts as "exercised on a running stack".
 
 | Feature | Layer | Status | Evidence | Tier | Notes |
 |---|---|---|---|---|---|
-| **Worker deployed to Cloudflare** | ops | **Not built** | `wrangler deploy` has never been run | **MUST** | §8: "Hosted frontend reaches authenticated Worker" |
-| **Frontend deployed to Firebase Hosting** | ops | **Not built** | No `firebase.json`, no `.firebaserc`, no `deploy:web` script | **MUST** | §24 lists `firebase.json` |
-| **`GEMINI_API_KEY` as a Worker secret** | ops | **Not built** | Key exists only in local `apps/api/.dev.vars` | **MUST** | `wrangler secret put` needs the Worker to exist first |
-| Production `ALLOWED_ORIGINS` / Authorized Domains | ops | **Not built** | `wrangler.jsonc` still carries `localhost:5173` | **MUST** | |
-| `deploy:api` script | ops | **Implemented** | `package.json` → `npm run deploy -w @cuepilot/api` | MUST | Script exists, never executed |
-| Deployed measurements (repair latency, freshness, script time, Worker CPU) | ops | **Not built** | `docs/measurements.md` lists all four as NOT YET MEASURED | **MUST** | §18 requires deployed numbers with sample counts |
+| **Worker deployed to Cloudflare** | ops | **Verified** | `https://cuepilot-api-production.cuepilot-api.workers.dev/v1/health` → 200, commit `7a1457a` | **MUST** | SQLite Durable Objects deployed with migration `v1` |
+| **Frontend deployed to Firebase Hosting** | ops | **Verified** | `https://smart-anchor-stage-flow-system.web.app`; live anonymous sign-in | **MUST** | `firebase.json` and `deploy:web` are committed deployment inputs |
+| **`GEMINI_API_KEY` as a Worker secret** | ops | **Verified** | `wrangler secret list` + production smoke run, 4/4 Gemini | **MUST** | Secret value is unreadable and absent from the repository |
+| Production `ALLOWED_ORIGINS` / Authorized Domains | ops | **Verified** | hosted-origin request returned the exact CORS origin and authenticated UI loaded | **MUST** | Both Firebase Hosting domains are allowlisted |
+| `deploy:api` script | ops | **Verified** | deployed `cuepilot-api-production`, version `bb56becc-bab7-434f-9f6c-fe91a5c4439b` | MUST | |
+| Deployed measurements (repair latency, freshness, script time, Worker CPU) | ops | **Verified** | `docs/measurements.md`; 30 repair requests, 20 publication updates, 20 script attempts, live-tail CPU | **MUST** | All four pass; first repair batch was noisy and is retained as a repeatability warning |
 | Cloudflare auth | ops | **Verified** | `wrangler whoami` → logged in, one account | MUST | |
-| Firebase CLI | ops | **Not built** | Not installed | MUST | |
+| Firebase CLI | ops | **Verified** | Firebase CLI 15.30.2; Hosting release completed | MUST | Invoked through a pinned `npx` deploy command, not a repository dependency |
 | Secret hygiene (full-history scan before every push) | ops | **Verified** | scan run before each of ~12 pushes; 189 blobs, all refs, clean | added-since | `.dev.vars`, `.env.local`, `firebase-config.txt` absent from all history |
 | Local measurements recorded | docs | **Verified** | `docs/measurements.md` | added-since | Labelled as localhost, not passed off as deployed |
-| CI pipeline | ops | **Not built** | No workflow file | added-since | Gates are run by hand |
+| CI pipeline | ops | **Implemented** | `.github/workflows/ci.yml` | added-since | Runs install, check and production build on pushes and pull requests; first GitHub-hosted run awaits push |
 
 ---
 
@@ -172,46 +172,43 @@ an API test passing counts as "exercised on a running stack".
 
 | Status | Count |
 |---|---|
-| **Verified** | 58 |
-| **Implemented** | 7 |
+| **Verified** | 80 |
+| **Implemented** | 2 |
 | **Partial** | 1 |
 | **Stubbed** | 0 |
-| **Not built** | 10 |
+| **Not built** | 2 |
 | **Cut** | 1 |
-| **Total** | 77 |
+| **Total** | 86 |
 
 ### MUST-tier completion
 
-Of the **61 MUST-tier rows**: 50 Verified, 5 Implemented, 1 Partial, 5 Not built.
+Of the **74 MUST-tier rows**: 73 Verified, 0 Implemented, 1 Partial, 0 Not built.
 
-- **Product MUSTs: 56 of 56 are Verified, Implemented or Partial — none missing.**
-- **Deployment MUSTs: 5 of 6 are Not built.**
+- **Product MUSTs: 66 of 66 are Verified, Implemented or Partial — none missing.**
+- **Deployment MUSTs: 8 of 8 are Verified.**
 
-So: **82% of MUST rows are Verified (50/61)**, and every one of the shortfalls is in
-deployment and deployed measurement, not in product behaviour. §8 counts deployment as a MUST
-with the acceptance condition *"Hosted frontend reaches authenticated Worker, durable storage
-and one real Gemini response"* — two of those three are proven locally; the hosting is not.
+So: **99% of MUST rows are Verified (73/74)**. §8's acceptance condition — *"Hosted frontend
+reaches authenticated Worker, durable storage and one real Gemini response"* — is now proven
+in production, and the deployed §18 performance sample is recorded.
 
 ---
 
-## README claims with no code
+## README issues found in the initial audit
 
 Checked every row of the README's feature tables against the source.
 
-1. **"M6 | Offline snapshot cache, countdown offset, printable runbook | Complete"** — offline
-   cache and countdown are Verified, but the **printable runbook has no test and no verified
-   print run**. Only a `@media print` block exists. Marking the row "Complete" overstates it.
+1. **Resolved 2026-09-20: printable runbook verification.** The initial audit found only a
+   `@media print` block. The e2e now produces a real A4 PDF; all two rendered pages were
+   visually inspected after fixing header contrast and an otherwise blank third page.
 2. **"Quality | … Playwright browser e2e | Complete"** — the e2e is real and it passes (I ran
    it: 1 test, 44.9 s). But it is **not part of `npm test`**, has **no `webServer` config**, and
    its default `baseURL` is `localhost:5173` while Vite falls back to `5174` whenever 5173 is
    taken. It passes only when someone has already started both servers on the right ports.
    "Complete" is defensible; "runs in CI" would not be.
-3. **"Roughly 90–95% of the specified scope is implemented, with the remainder being an
-   accessibility/localisation polish pass rather than product functionality."** — the second
-   half is **wrong**. The remainder also includes **all of deployment**, which §8 lists as a
-   MUST. Nothing has ever been deployed.
-4. **The milestone table has no deployment row at all.** It renumbers M6 as UI polish. A reader
-   would conclude deployment is either done or out of scope; it is neither.
+3. The old **"Roughly 90–95%"** claim omitted deployment. It has been removed now that the
+   production deployment is verified.
+4. The milestone table originally omitted deployment. It now records the Firebase Hosting,
+   Cloudflare Worker and production Gemini deployment.
 
 No README row was found to be entirely fictional — every claimed feature exists in some form.
 The mismatches are all **overstatement of completeness**, not invention.
@@ -242,24 +239,24 @@ These exist and work but a judge reading only the README would miss them:
 
 ## Deployment status
 
-**Nothing has ever been deployed. There is no live URL.**
+**Production is live.**
 
-Everything demonstrated so far ran on `wrangler dev` (127.0.0.1:8787) and `vite dev`
-(localhost:5173/5174). Cloudflare is authenticated; the Firebase CLI is not installed; there is
-no `firebase.json`, no `.firebaserc` and no `deploy:web` script. The Gemini key exists only in
-a local gitignored `.dev.vars`, so the production secret has never been set.
+- Frontend: `https://smart-anchor-stage-flow-system.web.app`
+- API: `https://cuepilot-api-production.cuepilot-api.workers.dev`
+- Health: 200 with build commit `7a1457a`
+- Firebase anonymous sign-in: verified in the hosted app
+- Hosted-origin CORS: verified against the Worker
+- Gemini: 4/4 production drafts returned from `gemini-3.5-flash-lite`; one was approved
 
 ## The three biggest risks to the submission
 
-1. **Nothing is deployed, and §8 makes that a MUST.** The acceptance condition is a hosted
-   frontend reaching an authenticated Worker. Every unknown in a first deploy — CORS between
-   the Hosting domain and `workers.dev`, Firebase authorized domains, the DO `new_sqlite_classes`
-   migration, and above all the **10 ms CPU limit under real RS256 verification** — is still
-   unknown. This is the single largest gap and it is the one most likely to consume hours.
-2. **Four §18 metrics are unmeasured, and they cannot be faked from localhost.** Repair latency
-   p95, publication freshness, script response time and Worker CPU all require the deployed
-   stack. §18 demands sample counts and environment. Filling them with local figures would be
-   the kind of claim the report repeatedly forbids.
+1. **Repair latency has a cold/noisy-run warning.** The CPU-correlated 30-request batch passed
+   at 377 ms p95, and three other repeat batches passed, but the first batch measured 2,335 ms
+   p95. The raw fact is recorded rather than hidden; a larger geographically distributed run
+   would be needed before claiming universally stable sub-500 ms latency.
+2. **A formal screen-reader audit is still absent.** Keyboard traversal, focus restoration,
+   reduced motion, non-colour status and live-region behavior now have automated evidence, but
+   that is not equivalent to testing with VoiceOver, NVDA or another assistive reader.
 3. **The README's roadmap contradicts §5 and §8 in a way a judge can catch.** Its two
    highest-priority roadmap items are an **AI voice anchor assistant** (speech-to-text) and an
    **AI speaker reminder agent** contacting speakers by *"WhatsApp / SMS / email, optional voice
